@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "86478268234",
+    "project_id": "koiyure-334de",
+    "storage_bucket": "koiyure-334de.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:86478268234:android:a282f2af0c6eea038943b3",
+        "android_client_info": {
+          "package_name": "com.example.koiyure"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBqfJMKvpx-GRmPwwiP2ewvUmV8dT9uFNQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
