@@ -5,16 +5,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="scripts.js"></script>
-    <script src="P2P.sj"></script>
+    <script src="P2P.js"></script>
     <link rel="stylesheet" href="Styles.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <title>古明地こいしアプリ</title>
+    <link rel="icon" src="Img\epicenter.png">
 </head>
 
 <body>
-    <h1 id="now_time">2000/01/01 00:00:00(000)</h1>
+    <h1 id="now_time">2000/01/01 00:00:00</h1>
     <textarea id="maintextarea" rows="1" readonly></textarea>
-    <input type="range" id="pagebar" min="-100" max="100" value="1">
+    <input type="range" id="pagebar" min="0" max="0" value="0">
     <div class="koisiarrow_box">古明地こいしだよ!!</div>
     <img src="Img/baclgroundimg.jpg" id="back">
     <img src="Img/hyoujyou_bishou_koisi.png" id="koisi">
@@ -36,23 +38,20 @@
     <button id="toggleinfoMenuBtn">☰</button>
 
     <script>
-        // Menu Toggle
+        // --- メニュー開閉 ---
         const menu = document.getElementById('menu');
         const toggleMenuBtn = document.getElementById('toggleMenuBtn');
-
         toggleMenuBtn.addEventListener('click', () => {
             menu.classList.toggle('open');
         });
 
-        // Infomenu Toggle
         const infomenu = document.getElementById('infomenu');
         const toggleinfoMenuBtn = document.getElementById('toggleinfoMenuBtn');
-
         toggleinfoMenuBtn.addEventListener('click', () => {
             infomenu.classList.toggle('open');
         });
 
-        // 現在時刻を表示
+        // --- 現在時刻表示 ---
         function NowTimeChange() {
             const now = new Date();
             const year = now.getFullYear();
@@ -63,42 +62,47 @@
             const seconds = String(now.getSeconds()).padStart(2, '0');
             const milli = String(now.getMilliseconds()).padStart(3, '0');
             document.getElementById("now_time").textContent =
-                `${year}/${month}/${day} ${hours}:${minutes}:${seconds}(${milli})`;
+                `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
         }
-        setInterval(NowTimeChange, 1);
-    </script>
+        setInterval(NowTimeChange, 1000); // 1秒ごとで十分
 
-    <script>
+        // --- データ管理 ---
         let AllWebsocketData = [];
 
+        function MainTextarea(num) {
+            const textarea = document.getElementById("maintextarea");
+            if (!textarea) return;
+
+            if (num >= 0 && num < AllWebsocketData.length) {
+                const value = AllWebsocketData[num];
+                textarea.value = value ?? "(空のメッセージ)";
+            }
+        }
+
+        // --- データ受信時 ---
         function onP2PMessage(msg) {
-            console.log("P2P受信:", msg);
             AllWebsocketData.push(msg);
+            updatePagebar();
             MainTextarea(AllWebsocketData.length - 1);
         }
 
         function onWolfxMessage(msg) {
-            console.log("Wolfx受信:", msg);
             AllWebsocketData.push(msg);
+            updatePagebar();
             MainTextarea(AllWebsocketData.length - 1);
         }
 
-        function MainTextarea(num) {
-            const textarea = document.getElementById("maintextarea");
-            if (!textarea) {
-                console.error("maintextarea が見つからない");
-                return;
-            }
-            if (num >= 0 && num < AllWebsocketData.length) {
-                const value = AllWebsocketData[num];
-                textarea.value = value ?? "(空のメッセージ)";
-                if (value === "" || value == null) {
-                    console.warn("msg が空でした:", value);
-                }
-            } else {
-                console.warn("不正な num:", num, "length:", AllWebsocketData.length);
-            }
+        function updatePagebar() {
+            const pagebar = document.getElementById("pagebar");
+            pagebar.max = AllWebsocketData.length - 1;
+            pagebar.value = AllWebsocketData.length - 1;
         }
+
+        // --- スライダー操作 ---
+        document.getElementById("pagebar").addEventListener("input", function () {
+            const index = parseInt(this.value);
+            MainTextarea(index);
+        });
     </script>
 </body>
 
