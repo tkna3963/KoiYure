@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="scripts.js"></script>
+    <script src="P2P.sj"></script>
+    <link rel="stylesheet" href="Styles.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+</head>
+
+<body>
+    <h1 id="now_time">2000/01/01 00:00:00(000)</h1>
+    <textarea id="maintextarea" rows="1" readonly></textarea>
+    <input type="range" id="pagebar" min="-100" max="100" value="1">
+    <div class="koisiarrow_box">古明地こいしだよ!!</div>
+    <img src="Img/baclgroundimg.jpg" id="back">
+    <img src="Img/hyoujyou_bishou_koisi.png" id="koisi">
+
+    <!-- メニュー -->
+    <div id="menu">
+        <h2>メニュー</h2>
+        <a id="linker" target="_blank" href="https://github.com/tkna3963/Koi-Yura">Github </a>
+        <a id="linker" target="_blank" href="https://twitter.com/tkna3963">作者Twitter </a>
+    </div>
+
+    <!-- 情報メニュー -->
+    <div id="infomenu">
+        <h2>情報メニュー</h2>
+    </div>
+
+    <!-- ボタン -->
+    <button id="toggleMenuBtn">☰</button>
+    <button id="toggleinfoMenuBtn">☰</button>
+
+    <script>
+        // Menu Toggle
+        const menu = document.getElementById('menu');
+        const toggleMenuBtn = document.getElementById('toggleMenuBtn');
+
+        toggleMenuBtn.addEventListener('click', () => {
+            menu.classList.toggle('open');
+        });
+
+        // Infomenu Toggle
+        const infomenu = document.getElementById('infomenu');
+        const toggleinfoMenuBtn = document.getElementById('toggleinfoMenuBtn');
+
+        toggleinfoMenuBtn.addEventListener('click', () => {
+            infomenu.classList.toggle('open');
+        });
+
+        // 現在時刻を表示
+        function NowTimeChange() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const milli = String(now.getMilliseconds()).padStart(3, '0');
+            document.getElementById("now_time").textContent =
+                `${year}/${month}/${day} ${hours}:${minutes}:${seconds}(${milli})`;
+        }
+        setInterval(NowTimeChange, 1);
+    </script>
+
+    <script>
+        let AllWebsocketData = [];
+
+        function onP2PMessage(msg) {
+            console.log("P2P受信:", msg);
+            AllWebsocketData.push(msg);
+            MainTextarea(AllWebsocketData.length - 1);
+        }
+
+        function onWolfxMessage(msg) {
+            console.log("Wolfx受信:", msg);
+            AllWebsocketData.push(msg);
+            MainTextarea(AllWebsocketData.length - 1);
+        }
+
+        function MainTextarea(num) {
+            const textarea = document.getElementById("maintextarea");
+            if (!textarea) {
+                console.error("maintextarea が見つからない");
+                return;
+            }
+            if (num >= 0 && num < AllWebsocketData.length) {
+                const value = AllWebsocketData[num];
+                textarea.value = value ?? "(空のメッセージ)";
+                if (value === "" || value == null) {
+                    console.warn("msg が空でした:", value);
+                }
+            } else {
+                console.warn("不正な num:", num, "length:", AllWebsocketData.length);
+            }
+        }
+    </script>
+</body>
+
+</html>
