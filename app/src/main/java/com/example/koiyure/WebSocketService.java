@@ -9,7 +9,6 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
-import android.os.Environment;
 import android.os.IBinder;
 import android.speech.tts.TextToSpeech;
 import android.util.Log;
@@ -17,9 +16,14 @@ import android.util.Log;
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.InputStreamReader;
 import java.util.Locale;
 
 public class WebSocketService extends Service {
@@ -37,7 +41,7 @@ public class WebSocketService extends Service {
         createNotificationChannel();
         startForeground(1, createNotification());
 
-        // TTSの初期化
+        // TTS初期化
         tts = new TextToSpeech(this, status -> {
             if (status == TextToSpeech.SUCCESS) {
                 tts.setLanguage(Locale.JAPANESE);
@@ -46,7 +50,7 @@ public class WebSocketService extends Service {
             }
         });
 
-        // WebSocketの初期化と接続
+        // WebSocket初期化
         p2pWebsocket = new P2PWebsocket();
         wolfxWebsocket = new WolfxWebsocket();
 
@@ -60,38 +64,86 @@ public class WebSocketService extends Service {
     private void handleMessage(String message) {
         Log.d(TAG, "受信: " + message);
 
-        // TTSで読み上げ
-        if (tts != null) {
-            tts.speak(message, TextToSpeech.QUEUE_ADD, null, null);
-        }
+        // TTS（必要なら有効化）
+        // if (tts != null) {
+        //     tts.speak(message, TextToSpeech.QUEUE_ADD, null, "msgId");
+        // }
 
-        // JSONデータをローカルに保存
-        saveJsonToFile(message);
+        // JSON累積保存
+        saveJsonToInternalStorage(message);
 
-        // ウィジェットにデータを反映
+        // ウィジェット更新
         WidgetProvider.setLastReceivedData(message);
         AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(this);
-        WidgetProvider.updateWidget(this, appWidgetManager, appWidgetManager.getAppWidgetIds(new ComponentName(this, WidgetProvider.class)));
+        WidgetProvider.updateWidget(
+                this,
+                appWidgetManager,
+                appWidgetManager.getAppWidgetIds(new ComponentName(this, WidgetProvider.class))
+        );
     }
 
-    private void saveJsonToFile(String json) {
-        File dir = new File(getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "WebSocketLogs");
-        if (!dir.exists() && !dir.mkdirs()) {
-            Log.e(TAG, "ディレクトリ作成失敗");
-            return;
-        }
+    /**
+     * JSON配列として内部ストレージに累積保存
+     */
+    private void saveJsonToInternalStorage(String json) {
+        String fileName = "all_received_data.json";
+        try {
+            JSONArray array;
 
-        File file = new File(dir, "log.json");
-        try (FileWriter writer = new FileWriter(file, true)) {
-            writer.write(json + "\n");
-            Log.d(TAG, "JSONデータを保存: " + file.getAbsolutePath());
-        } catch (IOException e) {
-            Log.e(TAG, "JSON保存失敗", e);
+            // 既存ファイルを読み込む
+            try (FileInputStream fis = openFileInput(fileName);
+                 InputStreamReader isr = new InputStreamReader(fis);
+                 BufferedReader reader = new BufferedReader(isr)) {
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    sb.append(line);
+                }
+                if (sb.length() > 0) {
+                    array = new JSONArray(sb.toString());
+                } else {
+                    array = new JSONArray();
+                }
+            } catch (FileNotFoundException e) {
+                // 初回はファイルが存在しないので新規作成
+                array = new JSONArray();
+            }
+
+            // 新しいデータを追加
+            array.put(new JSONObject(json));
+
+            // ファイルに書き戻し
+            try (FileOutputStream fos = openFileOutput(fileName, Context.MODE_PRIVATE)) {
+                fos.write(array.toString().getBytes());
+                Log.d(TAG, "JSONデータを内部ストレージに保存しました: " + fileName);
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "JSONデータ保存エラー", e);
+        }
+    }
+
+    private String loadJsonFromInternalStorage() {
+        String fileName = "all_received_data.json";
+        try (FileInputStream fis = openFileInput(fileName);
+             InputStreamReader isr = new InputStreamReader(fis);
+             BufferedReader reader = new BufferedReader(isr)) {
+            StringBuilder stringBuilder = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                stringBuilder.append(line);
+            }
+            Log.d(TAG, "JSONデータを内部ストレージから読み込みました: " + fileName);
+            return stringBuilder.toString();
+        } catch (Exception e) {
+            Log.e(TAG, "JSONデータの読み込みに失敗しました", e);
+            return null;
         }
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        // システム再起動後にもソケットを復帰させたいならここで再初期化しても良い
         return START_STICKY;
     }
 
@@ -123,7 +175,7 @@ public class WebSocketService extends Service {
                     "WebSocket Service",
                     NotificationManager.IMPORTANCE_LOW
             );
-            NotificationManager manager = getSystemService(NotificationManager.class);
+            NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             if (manager != null) {
                 manager.createNotificationChannel(channel);
             }
