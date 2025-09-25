@@ -31,7 +31,6 @@ android {
 }
 
 dependencies {
-
     implementation libs.appcompat
     implementation libs.material
     implementation libs.activity
@@ -39,11 +38,19 @@ dependencies {
     testImplementation libs.junit
     androidTestImplementation libs.ext.junit
     androidTestImplementation libs.espresso.core
+
+    // ネットワーク通信
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+
+    // 位置情報
     implementation 'com.google.android.gms:play-services-location:21.0.1'
+
+    // ワーカー
     implementation "androidx.work:work-runtime:2.8.1"
+
+    // Firebase（BOMでバージョン統一）
     implementation platform('com.google.firebase:firebase-bom:33.16.0')
-    implementation 'com.google.firebase:firebase-crashlytics-ndk'
     implementation 'com.google.firebase:firebase-analytics'
     implementation 'com.google.firebase:firebase-crashlytics'
+    implementation 'com.google.firebase:firebase-crashlytics-ndk'
 }

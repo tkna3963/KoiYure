@@ -10,6 +10,7 @@ import android.os.Looper;
 import android.os.PowerManager;
 import android.provider.Settings;
 import android.util.Log;
+import android.webkit.CookieManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -18,7 +19,9 @@ import android.widget.Toast;
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+
 import org.json.JSONObject;
+
 import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -45,6 +48,16 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
         webView = findViewById(R.id.webView);
         WebSettings webSettings = webView.getSettings();
         webSettings.setJavaScriptEnabled(true);
+
+        // ローカルストレージやCookieを有効化
+        webSettings.setDomStorageEnabled(true); // localStorage / sessionStorage
+        webSettings.setDatabaseEnabled(true);   // Web SQL / IndexedDB
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
+        } else {
+            CookieManager.getInstance().setAcceptCookie(true);
+        }
+
         // WebViewのデバッグを有効にする (開発時のみ)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             WebView.setWebContentsDebuggingEnabled(true);
@@ -55,8 +68,6 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 Log.d(TAG, "WebView finished loading: " + url);
-                // ページロード完了後にJavaScriptからデータを取得するトリガーなど
-                // 例: webView.evaluateJavascript("window.onPageLoaded();", null);
             }
         });
         webView.loadUrl("file:///android_asset/MainIndex.html");
@@ -117,7 +128,6 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
     @Override
     public void onP2PStatusChanged(boolean isConnected) {
         Log.d(TAG, "P2P WebSocket Status: " + (isConnected ? "Connected" : "Disconnected"));
-        // WebViewのJavaScript関数を呼び出して接続状態を通知
         sendMessageToWebView("onP2PStatusChange", String.valueOf(isConnected));
     }
 
@@ -130,19 +140,13 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
     @Override
     public void onWolfxStatusChanged(boolean isConnected) {
         Log.d(TAG, "Wolfx WebSocket Status: " + (isConnected ? "Connected" : "Disconnected"));
-        // WebViewのJavaScript関数を呼び出して接続状態を通知
         sendMessageToWebView("onWolfxStatusChange", String.valueOf(isConnected));
     }
 
     private void sendMessageToWebView(String jsFunction, String message) {
-        // メッセージがnullでないことを確認
-        if (message == null) {
-            message = "";
-        }
+        if (message == null) message = "";
         try {
-            // JavaScriptの文字列リテラルとして安全にエスケープ
             String escapedMessage = JSONObject.quote(message);
-            // WebView.evaluateJavascript()は"javascript:"プレフィックスを必要としない
             final String jsCode = jsFunction + "(" + escapedMessage + ");";
             Log.d(TAG, "Queueing JS: " + jsCode);
 
@@ -156,11 +160,11 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
     }
 
     private void processQueue() {
-        if (isSending) return; // 既に送信中であれば何もしない
+        if (isSending) return;
 
         String js;
         synchronized (jsQueue) {
-            js = jsQueue.poll(); // キューから次のJSコードを取得
+            js = jsQueue.poll();
         }
 
         if (js != null) {
@@ -169,21 +173,19 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
             mainHandler.post(() -> {
                 if (webView != null) {
                     webView.evaluateJavascript(finalJs, value -> {
-                        // Log.d(TAG, "JS executed: " + finalJs + ", Result: " + value); // 頻繁なログは避ける
                         isSending = false;
-                        processQueue(); // 完了したら次のJSを処理
+                        processQueue();
                     });
                 } else {
                     Log.w(TAG, "WebView is null, cannot execute JS: " + finalJs);
                     isSending = false;
-                    processQueue(); // WebViewがない場合でもキューは進める
+                    processQueue();
                 }
             });
         } else {
-            isSending = false; // キューが空になった
+            isSending = false;
         }
     }
-
 
     private String loadJsonFromInternalStorage() {
         String fileName = "all_received_data.json";
@@ -216,14 +218,11 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
             wolfxWebsocket = null;
         }
         if (webView != null) {
-            webView.destroy(); // WebViewを破棄してメモリリークを防ぐ
+            webView.destroy();
             webView = null;
         }
-        // WebSocketServiceはMainActivityが閉じても生き続けるように設計されているため、
-        // ここでstopServiceは呼ばない。サービスは自身のライフサイクルで管理する。
     }
 
-    // JavaScriptインターフェースクラス
     public class WebAppInterface {
         MainActivity mActivity;
 
@@ -234,7 +233,6 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
         @android.webkit.JavascriptInterface
         public String getLocalData() {
             Log.d(TAG, "getLocalData() called from WebView.");
-            // ローカルデータを読み込む
             String data = mActivity.loadJsonFromInternalStorage();
             return data != null ? data : "データがありません";
         }
