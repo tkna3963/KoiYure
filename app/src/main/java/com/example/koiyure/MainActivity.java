@@ -19,6 +19,9 @@ import android.widget.Toast;
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.work.ExistingPeriodicWorkPolicy;
+import androidx.work.PeriodicWorkRequest;
+import androidx.work.WorkManager;
 
 import org.json.JSONObject;
 
@@ -28,6 +31,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends AppCompatActivity implements P2PWebsocket.Listener, WolfxWebsocket.Listener {
 
@@ -38,6 +42,10 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Queue<String> jsQueue = new LinkedList<>();
     private boolean isSending = false;
+
+    // ★★★ 接続状態を保持するフィールドを追加 ★★★
+    private boolean isP2PConnected = false;
+    private boolean isWolfxConnected = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -68,6 +76,9 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 Log.d(TAG, "WebView finished loading: " + url);
+                // ページロード完了時に現在の接続状態をWebViewに通知する
+                sendMessageToWebView("onP2PStatusChange", String.valueOf(isP2PConnected));
+                sendMessageToWebView("onWolfxStatusChange", String.valueOf(isWolfxConnected));
             }
         });
         webView.loadUrl("file:///android_asset/MainIndex.html");
@@ -94,6 +105,33 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
 
         // バッテリー最適化の無視をリクエスト
         requestIgnoreBatteryOptimizations();
+
+        // WorkManagerでWebSocketServiceの監視をスケジュール
+        scheduleWebSocketRestartWorker();
+    }
+
+    /**
+     * WebSocketServiceが常に稼働していることを確認するためのWorkManagerをスケジュールします。
+     */
+    private void scheduleWebSocketRestartWorker() {
+        Log.d(TAG, "Scheduling WebSocketRestartWorker...");
+        // 最小実行間隔はPeriodicWorkRequest.MIN_PERIODIC_INTERVAL_MILLIS (15分)
+        PeriodicWorkRequest workRequest = new PeriodicWorkRequest.Builder(
+                WebSocketRestartWorker.class,
+                15, // 15分ごとにチェック
+                TimeUnit.MINUTES
+        )
+                // アプリ起動後、初回は少し遅延させてから実行する
+                .setInitialDelay(30, TimeUnit.SECONDS)
+                .addTag("WebSocketRestartWorkerTag") // タグを追加してログなどで識別しやすくする
+                .build();
+
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+                "WebSocketServiceRestart", // このWorkを一意に識別する名前
+                ExistingPeriodicWorkPolicy.UPDATE, // 既に同名のWorkが存在すれば更新
+                workRequest
+        );
+        Log.d(TAG, "WebSocketRestartWorker scheduled successfully.");
     }
 
     private void requestIgnoreBatteryOptimizations() {
@@ -121,34 +159,37 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
 
     @Override
     public void onP2PMessageReceived(String message) {
-        Log.d(TAG, "P2P受信: " + message);
+        Log.d(TAG, "P2P受信 (MainActivity): " + message);
         sendMessageToWebView("onP2PMessage", message);
     }
 
     @Override
     public void onP2PStatusChanged(boolean isConnected) {
-        Log.d(TAG, "P2P WebSocket Status: " + (isConnected ? "Connected" : "Disconnected"));
+        Log.d(TAG, "P2P WebSocket Status (MainActivity): " + (isConnected ? "Connected" : "Disconnected"));
+        this.isP2PConnected = isConnected; // ★★★ 状態を更新 ★★★
         sendMessageToWebView("onP2PStatusChange", String.valueOf(isConnected));
     }
 
     @Override
     public void onWolfxMessageReceived(String message) {
-        Log.d(TAG, "Wolfx受信: " + message);
+        Log.d(TAG, "Wolfx受信 (MainActivity): " + message);
         sendMessageToWebView("onWolfxMessage", message);
     }
 
     @Override
     public void onWolfxStatusChanged(boolean isConnected) {
-        Log.d(TAG, "Wolfx WebSocket Status: " + (isConnected ? "Connected" : "Disconnected"));
+        Log.d(TAG, "Wolfx WebSocket Status (MainActivity): " + (isConnected ? "Connected" : "Disconnected"));
+        this.isWolfxConnected = isConnected; // ★★★ 状態を更新 ★★★
         sendMessageToWebView("onWolfxStatusChange", String.valueOf(isConnected));
     }
 
     private void sendMessageToWebView(String jsFunction, String message) {
         if (message == null) message = "";
         try {
+            // JavaScriptに渡す文字列はエスケープする必要がある
             String escapedMessage = JSONObject.quote(message);
-            final String jsCode = jsFunction + "(" + escapedMessage + ");";
-            Log.d(TAG, "Queueing JS: " + jsCode);
+            final String jsCode = "javascript:" + jsFunction + "(" + escapedMessage + ");";
+            Log.d(TAG, "Queueing JS for WebView: " + jsCode);
 
             synchronized (jsQueue) {
                 jsQueue.add(jsCode);
@@ -160,30 +201,31 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
     }
 
     private void processQueue() {
-        if (isSending) return;
+        if (isSending) return; // 既に送信中なら処理しない
 
         String js;
         synchronized (jsQueue) {
-            js = jsQueue.poll();
+            js = jsQueue.poll(); // キューから最初の要素を取り出す
         }
 
         if (js != null) {
-            isSending = true;
+            isSending = true; // 送信中フラグを立てる
             final String finalJs = js;
             mainHandler.post(() -> {
                 if (webView != null) {
+                    // evaluateJavascriptはAndroid 4.4 (API 19) 以降で利用可能
                     webView.evaluateJavascript(finalJs, value -> {
-                        isSending = false;
-                        processQueue();
+                        isSending = false; // 送信完了
+                        processQueue(); // 次の要素を処理
                     });
                 } else {
                     Log.w(TAG, "WebView is null, cannot execute JS: " + finalJs);
-                    isSending = false;
-                    processQueue();
+                    isSending = false; // WebViewがnullでもフラグをリセット
+                    processQueue(); // 次の要素を処理
                 }
             });
         } else {
-            isSending = false;
+            isSending = false; // キューが空になったらフラグをリセット
         }
     }
 
@@ -209,6 +251,9 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
     protected void onDestroy() {
         super.onDestroy();
         Log.d(TAG, "MainActivity onDestroy");
+
+        // WorkManagerはMainActivityがdestroyされても動作を継続するため、ここでは停止しない
+
         if (p2pWebsocket != null) {
             p2pWebsocket.stop();
             p2pWebsocket = null;
@@ -218,11 +263,16 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
             wolfxWebsocket = null;
         }
         if (webView != null) {
-            webView.destroy();
+            webView.destroy(); // WebViewを破棄してメモリリークを防ぐ
             webView = null;
         }
+        // Handlerのコールバックを全て削除
+        mainHandler.removeCallbacksAndMessages(null);
     }
 
+    /**
+     * WebViewからJavaScript経由で呼び出されるインターフェース。
+     */
     public class WebAppInterface {
         MainActivity mActivity;
 
@@ -233,8 +283,24 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
         @android.webkit.JavascriptInterface
         public String getLocalData() {
             Log.d(TAG, "getLocalData() called from WebView.");
+            // メインスレッドで実行する必要がある場合は、Handler.post()を使う
+            // しかし、ここではファイル読み込みなので特に問題なし
             String data = mActivity.loadJsonFromInternalStorage();
             return data != null ? data : "データがありません";
+        }
+
+        // ★★★ P2P WebSocketの接続状態を取得するメソッドを追加 ★★★
+        @android.webkit.JavascriptInterface
+        public boolean isP2PWebSocketConnected() {
+            Log.d(TAG, "isP2PWebSocketConnected() called from WebView. Status: " + mActivity.isP2PConnected);
+            return mActivity.isP2PConnected;
+        }
+
+        // ★★★ Wolfx WebSocketの接続状態を取得するメソッドを追加 ★★★
+        @android.webkit.JavascriptInterface
+        public boolean isWolfxWebSocketConnected() {
+            Log.d(TAG, "isWolfxWebSocketConnected() called from WebView. Status: " + mActivity.isWolfxConnected);
+            return mActivity.isWolfxConnected;
         }
     }
 }

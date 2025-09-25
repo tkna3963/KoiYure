@@ -213,3 +213,41 @@ button:hover { background-color: #444; }
 #linker:hover {
     background-color: #0aa07c;
 }
+
+/* WebSocket ステータスインジケーター */
+.status-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 5px;
+    vertical-align: middle;
+    border: 1px solid #555; /* 枠線を追加して視認性を向上 */
+}
+
+.status-connected {
+    background-color: limegreen; /* 接続中は緑 */
+}
+
+.status-disconnected {
+    background-color: crimson; /* 切断中は赤 */
+}
+
+/* メッセージログコンテナ */
+.log-container {
+    border: 1px solid #555;
+    background-color: #444;
+    height: 100px; /* 高さ制限 */
+    overflow-y: scroll; /* スクロール可能にする */
+    margin-top: 5px;
+    padding: 5px;
+    font-size: 12px;
+    color: #eee;
+}
+
+.log-container p {
+    margin: 2px 0;
+    white-space: nowrap; /* テキストの折り返しを防ぐ */
+    overflow: hidden;    /* はみ出したテキストを非表示に */
+    text-overflow: ellipsis; /* はみ出したテキストを...で表示 */
+}

@@ -52,6 +52,7 @@ public class WolfxWebsocket {
             Log.d(TAG, "WolfxWebsocket is stopped, not connecting.");
             return;
         }
+        // nullチェックを追加。すでにクライアントが破棄されている場合は再作成
         if (client == null) {
             client = new OkHttpClient.Builder()
                     .connectTimeout(10, TimeUnit.SECONDS)

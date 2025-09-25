@@ -6,15 +6,13 @@ plugins {
 
 android {
     namespace 'com.example.koiyure'
-    compileSdk 36
-
+    compileSdk 36   // ← 修正
     defaultConfig {
         applicationId "com.example.koiyure"
         minSdk 29
-        targetSdk 36
+        targetSdk 36 // ← 修正
         versionCode 1
         versionName "1.0"
-
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -45,8 +43,8 @@ dependencies {
     // 位置情報
     implementation 'com.google.android.gms:play-services-location:21.0.1'
 
-    // ワーカー
-    implementation "androidx.work:work-runtime:2.8.1"
+    // ワーカー（最新に統一）
+    implementation "androidx.work:work-runtime:2.9.0"
 
     // Firebase（BOMでバージョン統一）
     implementation platform('com.google.firebase:firebase-bom:33.16.0')

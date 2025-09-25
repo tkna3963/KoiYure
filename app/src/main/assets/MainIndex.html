@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <title>古明地こいしアプリ</title>
-    <link rel="icon" src="Img\epicenter.png">
+    <link rel="icon" href="Img/epicenter.png">
 </head>
 
 <body>
@@ -25,13 +25,27 @@
     <div id="menu">
         <h2>メニュー</h2>
         <a id="linker" target="_blank" href="settings.html">設定 </a>
+        <div id="localDataDisplay"></div>
+
+        <hr>
+        <h3>WebSocket 接続状態</h3>
+        <div>
+            <h4>P2P Quake</h4>
+            <span id="p2pStatusIndicator" class="status-indicator status-disconnected"></span>
+            <span id="p2pStatusText">切断</span>
+        </div>
+
+        <div>
+            <h4>Wolfx JMA EEW</h4>
+            <span id="wolfxStatusIndicator" class="status-indicator status-disconnected"></span>
+            <span id="wolfxStatusText">切断</span>
+        </div>
     </div>
 
     <!-- 情報メニュー -->
     <div id="infomenu">
         <h2>情報メニュー</h2>
         <button id="showLocalDataBtn">ローカルデータを表示</button>
-        <div id="localDataDisplay"></div>
     </div>
 
     <!-- ボタン -->
@@ -61,11 +75,10 @@
             const hours = String(now.getHours()).padStart(2, '0');
             const minutes = String(now.getMinutes()).padStart(2, '0');
             const seconds = String(now.getSeconds()).padStart(2, '0');
-            const milli = String(now.getMilliseconds()).padStart(3, '0');
             document.getElementById("now_time").textContent =
                 `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
         }
-        setInterval(NowTimeChange, 1000); // 1秒ごとで十分
+        setInterval(NowTimeChange, 1000);
 
         // --- データ管理 ---
         let AllWebsocketData = [];
@@ -80,7 +93,7 @@
             }
         }
 
-        // --- データ受信時 ---
+        // --- データ受信時 (MainActivityから呼ばれる) ---
         function onP2PMessage(msg) {
             AllWebsocketData.push(msg);
             updatePagebar();
@@ -95,8 +108,8 @@
 
         function updatePagebar() {
             const pagebar = document.getElementById("pagebar");
-            pagebar.max = AllWebsocketData.length - 1;
-            pagebar.value = AllWebsocketData.length - 1;
+            pagebar.max = AllWebsocketData.length > 0 ? AllWebsocketData.length - 1 : 0;
+            pagebar.value = AllWebsocketData.length > 0 ? AllWebsocketData.length - 1 : 0;
         }
 
         // --- スライダー操作 ---
@@ -107,10 +120,55 @@
 
         // ローカルデータ表示ボタンのクリックイベント
         document.getElementById("showLocalDataBtn").addEventListener("click", () => {
-            // Androidインターフェースを通じてデータを取得
-            const localData = Android.getLocalData();
-            document.getElementById("localDataDisplay").textContent = localData;
+            if (typeof Android !== 'undefined' && Android !== null) {
+                const localData = Android.getLocalData();
+                document.getElementById("localDataDisplay").textContent = localData;
+            } else {
+                document.getElementById("localDataDisplay").textContent = 'Android APIが利用できません。';
+            }
         });
+
+        // --- WebSocket 接続状態表示関数 ---
+        function updateStatusDisplay(indicatorId, textId, isConnected) {
+            const indicatorElement = document.getElementById(indicatorId);
+            const textElement = document.getElementById(textId);
+
+            if (indicatorElement && textElement) {
+                if (isConnected) {
+                    indicatorElement.classList.remove('status-disconnected');
+                    indicatorElement.classList.add('status-connected');
+                    textElement.textContent = '接続中';
+                } else {
+                    indicatorElement.classList.remove('status-connected');
+                    indicatorElement.classList.add('status-disconnected');
+                    textElement.textContent = '切断';
+                }
+            }
+        }
+
+        // AndroidからP2P WebSocketの状態変更通知を受け取るグローバル関数
+        function onP2PStatusChange(isConnectedStr) {
+            const isConnected = (isConnectedStr === 'true');
+            updateStatusDisplay('p2pStatusIndicator', 'p2pStatusText', isConnected);
+        }
+
+        // AndroidからWolfx WebSocketの状態変更通知を受け取るグローバル関数
+        function onWolfxStatusChange(isConnectedStr) {
+            const isConnected = (isConnectedStr === 'true');
+            updateStatusDisplay('wolfxStatusIndicator', 'wolfxStatusText', isConnected);
+        }
+
+        // WebViewがロードされたときに初期状態を確認
+        window.onload = function () {
+            if (typeof Android !== 'undefined' && Android !== null) {
+                updateStatusDisplay('p2pStatusIndicator', 'p2pStatusText', Android.isP2PWebSocketConnected());
+                updateStatusDisplay('wolfxStatusIndicator', 'wolfxStatusText', Android.isWolfxWebSocketConnected());
+            } else {
+                document.getElementById('p2pStatusText').textContent = 'Android API利用不可';
+                document.getElementById('wolfxStatusText').textContent = 'Android API利用不可';
+            }
+        };
+
     </script>
 </body>
 
