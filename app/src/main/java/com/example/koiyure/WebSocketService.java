@@ -27,6 +27,10 @@ import android.util.Log;
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -45,8 +49,6 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
     private TextToSpeech tts;
     private ConnectivityManager.NetworkCallback networkCallback;
     private ConnectivityManager connectivityManager;
-
-    // WakeLock
     private PowerManager.WakeLock wakeLock;
 
     private static final long HEALTH_CHECK_INTERVAL_MS = 30 * 1000; // 30秒ごと
@@ -54,28 +56,24 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
     private Runnable healthCheckRunnable = new Runnable() {
         @Override
         public void run() {
-            Log.d(TAG, "Service health check running...");
+            Log.d(TAG, "サービスのヘルスチェック実行中...");
             boolean p2pConnected = p2pWebsocket != null && p2pWebsocket.isConnected();
             boolean wolfxConnected = wolfxWebsocket != null && wolfxWebsocket.isConnected();
 
             if (!p2pConnected) {
-                Log.w(TAG, "P2P WebSocket disconnected or null. Restarting P2P...");
+                Log.w(TAG, "P2P WebSocketが切断中またはnullです。再起動します...");
                 if (p2pWebsocket != null) p2pWebsocket.stop();
                 p2pWebsocket = new P2PWebsocket();
                 p2pWebsocket.setListener(WebSocketService.this);
                 p2pWebsocket.start();
-            } else {
-                Log.d(TAG, "P2P WebSocket is connected.");
             }
 
             if (!wolfxConnected) {
-                Log.w(TAG, "Wolfx WebSocket disconnected or null. Restarting Wolfx...");
+                Log.w(TAG, "Wolfx WebSocketが切断中またはnullです。再起動します...");
                 if (wolfxWebsocket != null) wolfxWebsocket.stop();
                 wolfxWebsocket = new WolfxWebsocket();
                 wolfxWebsocket.setListener(WebSocketService.this);
                 wolfxWebsocket.start();
-            } else {
-                Log.d(TAG, "Wolfx WebSocket is connected.");
             }
 
             healthCheckHandler.postDelayed(this, HEALTH_CHECK_INTERVAL_MS);
@@ -86,72 +84,54 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
     public void onCreate() {
         super.onCreate();
         Log.d(TAG, "WebSocketService onCreate");
+
         createNotificationChannel();
         startForeground(SERVICE_NOTIFICATION_ID, createNotification());
 
-        // WakeLockの取得は充電中に限定する
-        // サービスが常にバックグラウンドで動き続ける場合は、このWakeLockは過剰になる可能性も考慮する
-        // ただし、バックグラウンドでの安定性を重視する目的であれば維持
         PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
         if (powerManager != null) {
             BatteryManager batteryManager = (BatteryManager) getSystemService(Context.BATTERY_SERVICE);
-            boolean isCharging = false;
-            if (batteryManager != null) {
-                isCharging = batteryManager.isCharging();
-            }
+            boolean isCharging = batteryManager != null && batteryManager.isCharging();
             if (isCharging) {
-                wakeLock = powerManager.newWakeLock(
-                        PowerManager.PARTIAL_WAKE_LOCK,
-                        "Koiyure::WebSocketServiceWakeLock");
-                if (wakeLock != null && !wakeLock.isHeld()) {
-                    wakeLock.acquire();
-                    Log.d(TAG, "WakeLock acquired (charging).");
-                }
-            } else {
-                Log.d(TAG, "Not charging. WakeLock not acquired.");
+                wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Koiyure::WebSocketServiceWakeLock");
+                if (!wakeLock.isHeld()) wakeLock.acquire();
+                Log.d(TAG, "WakeLockを取得しました。");
             }
         }
 
         tts = new TextToSpeech(this, status -> {
             if (status == TextToSpeech.SUCCESS) {
                 tts.setLanguage(Locale.JAPANESE);
+                Log.d(TAG, "TextToSpeechの初期化成功。日本語に設定しました。");
             } else {
-                Log.e(TAG, "TTS初期化失敗");
+                Log.e(TAG, "TextToSpeechの初期化に失敗しました。");
             }
         });
 
-        // WebSocketクライアントを初期化
         initializeWebSockets();
-
-        // ネットワーク状態の監視を登録
         registerNetworkCallback();
-        // ヘルスチェックの定期実行を開始
         healthCheckHandler.postDelayed(healthCheckRunnable, HEALTH_CHECK_INTERVAL_MS);
     }
 
-    /**
-     * WebSocketクライアントを初期化し、接続を開始します。
-     * onCreateとnetworkCallbackから呼び出される可能性があります。
-     */
     private void initializeWebSockets() {
         if (p2pWebsocket == null) {
             p2pWebsocket = new P2PWebsocket();
             p2pWebsocket.setListener(this);
             p2pWebsocket.start();
-            Log.d(TAG, "P2PWebsocket initialized and started.");
+            Log.d(TAG, "P2P WebSocketを初期化して接続開始。");
         } else if (!p2pWebsocket.isConnected()) {
-            p2pWebsocket.start(); // 接続が切れている場合は再接続を試みる
-            Log.d(TAG, "P2PWebsocket re-started (was disconnected).");
+            p2pWebsocket.start();
+            Log.d(TAG, "P2P WebSocketを再接続。");
         }
 
         if (wolfxWebsocket == null) {
             wolfxWebsocket = new WolfxWebsocket();
             wolfxWebsocket.setListener(this);
             wolfxWebsocket.start();
-            Log.d(TAG, "WolfxWebsocket initialized and started.");
+            Log.d(TAG, "Wolfx WebSocketを初期化して接続開始。");
         } else if (!wolfxWebsocket.isConnected()) {
-            wolfxWebsocket.start(); // 接続が切れている場合は再接続を試みる
-            Log.d(TAG, "WolfxWebsocket re-started (was disconnected).");
+            wolfxWebsocket.start();
+            Log.d(TAG, "Wolfx WebSocketを再接続。");
         }
     }
 
@@ -161,56 +141,67 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
             networkCallback = new ConnectivityManager.NetworkCallback() {
                 @Override
                 public void onAvailable(Network network) {
-                    Log.d(TAG, "Network available. Checking WebSockets.");
-                    // ネットワークが利用可能になったら、WebSocketの再接続を試みる
-                    // initializeWebSockets() が内部でisConnected()をチェックして再接続する
+                    Log.d(TAG, "ネットワーク接続を検知。WebSocketを再初期化します。");
                     initializeWebSockets();
                 }
-
-                @Override
-                public void onLost(Network network) {
-                    Log.d(TAG, "Network lost. WebSockets might disconnect.");
-                }
             };
-            NetworkRequest networkRequest = new NetworkRequest.Builder()
+            NetworkRequest request = new NetworkRequest.Builder()
                     .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                     .build();
-            connectivityManager.registerNetworkCallback(networkRequest, networkCallback);
-            Log.d(TAG, "NetworkCallback registered.");
+            connectivityManager.registerNetworkCallback(request, networkCallback);
+            Log.d(TAG, "ネットワークコールバックを登録しました。");
         }
     }
 
     @Override
     public void onP2PMessageReceived(String message) {
-        Log.d(TAG, "P2P受信 (Service): " + message);
+        Log.d(TAG, "P2Pメッセージ受信: " + message);
         saveJsonToInternalStorage(message);
         updateWidget(message);
     }
 
     @Override
     public void onP2PStatusChanged(boolean isConnected) {
-        Log.d(TAG, "P2P WebSocket Status (Service): " + (isConnected ? "Connected" : "Disconnected"));
-        // 必要に応じて通知を更新するなどの処理を追加
+        Log.d(TAG, "P2P接続状態: " + (isConnected ? "接続中" : "切断中"));
     }
 
     @Override
     public void onWolfxMessageReceived(String message) {
-        Log.d(TAG, "Wolfx受信 (Service): " + message);
+        Log.d(TAG, "Wolfxメッセージ受信: " + message);
         saveJsonToInternalStorage(message);
         updateWidget(message);
     }
 
     @Override
     public void onWolfxStatusChanged(boolean isConnected) {
-        Log.d(TAG, "Wolfx WebSocket Status (Service): " + (isConnected ? "Connected" : "Disconnected"));
-        // 必要に応じて通知を更新するなどの処理を追加
+        Log.d(TAG, "Wolfx接続状態: " + (isConnected ? "接続中" : "切断中"));
     }
 
     private void saveJsonToInternalStorage(String json) {
         String fileName = "all_received_data.json";
-        try (FileOutputStream fos = openFileOutput(fileName, Context.MODE_APPEND)) {
-            fos.write((json + "\n").getBytes());
-            Log.d(TAG, "JSONデータを内部ストレージに追記: " + fileName);
+        JSONArray array;
+        String existing = loadJsonFromInternalStorage();
+        if (existing != null && !existing.isEmpty()) {
+            try {
+                array = new JSONArray(existing);
+            } catch (JSONException e) {
+                array = new JSONArray();
+                Log.w(TAG, "既存JSON読み込み失敗。新規JSONArrayを作成します。");
+            }
+        } else {
+            array = new JSONArray();
+        }
+
+        try {
+            array.put(new JSONObject(json));
+        } catch (JSONException e) {
+            Log.e(TAG, "JSON追加失敗", e);
+            return;
+        }
+
+        try (FileOutputStream fos = openFileOutput(fileName, Context.MODE_PRIVATE)) {
+            fos.write(array.toString().getBytes());
+            Log.d(TAG, "JSON配列として保存成功: " + array.toString());
         } catch (IOException e) {
             Log.e(TAG, "JSON保存失敗", e);
         }
@@ -223,13 +214,10 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
              BufferedReader reader = new BufferedReader(isr)) {
             StringBuilder sb = new StringBuilder();
             String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line);
-            }
-            Log.d(TAG, "JSONデータ読み込み成功: " + fileName);
+            while ((line = reader.readLine()) != null) sb.append(line);
             return sb.toString();
         } catch (IOException e) {
-            Log.e(TAG, "JSON読み込み失敗", e);
+            Log.w(TAG, "内部ストレージからJSON読み込み失敗", e);
             return null;
         }
     }
@@ -239,40 +227,31 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
         AppWidgetManager manager = AppWidgetManager.getInstance(this);
         ComponentName widget = new ComponentName(this, WidgetProvider.class);
         int[] ids = manager.getAppWidgetIds(widget);
-        if (ids.length > 0) WidgetProvider.updateWidget(this, manager, ids);
+        if (ids.length > 0) {
+            WidgetProvider.updateWidget(this, manager, ids);
+            Log.d(TAG, "ウィジェットを更新しました。");
+        }
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.d(TAG, "onStartCommand");
-        // START_REDELIVER_INTENT: システムがサービスを強制終了した場合、
-        // サービスを再作成し、最後にstartService()に渡されたIntentを再配信する。
-        // これにより、サービスが意図せず停止した場合の回復力が向上する。
-        return START_REDELIVER_INTENT; // ★★★ 変更点 ★★★
+        Log.d(TAG, "WebSocketService onStartCommand");
+        return START_REDELIVER_INTENT;
     }
 
     @Override
     public void onTaskRemoved(Intent rootIntent) {
-        Log.d(TAG, "onTaskRemoved: scheduling restart.");
-        // アプリがタスクから削除された場合、AlarmManagerでサービス再起動をスケジュール
+        Log.d(TAG, "タスク削除検知。サービスを再起動スケジュールします。");
         scheduleServiceRestart();
         super.onTaskRemoved(rootIntent);
     }
 
-    /**
-     * AlarmManagerを使用して、サービスを短時間後に再起動するようにスケジュールします。
-     * これは onTaskRemoved や、サービスがシステムによって強制終了された場合に役立ちます。
-     */
     private void scheduleServiceRestart() {
         Intent restartIntent = new Intent(getApplicationContext(), this.getClass());
-        // Android O (API 26) 以降では、暗黙的なブロードキャストは制限されるため、
-        // 明示的にパッケージ名を設定するのがベストプラクティス
         restartIntent.setPackage(getPackageName());
 
         PendingIntent restartPendingIntent = PendingIntent.getService(
-                this,
-                1, // リクエストコード
-                restartIntent,
+                this, 1, restartIntent,
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
                         ? PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_ONE_SHOT
                         : PendingIntent.FLAG_ONE_SHOT
@@ -280,112 +259,69 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
 
         AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
         if (alarmManager != null) {
-            // ELAPSED_REALTIME_WAKEUP: デバイスがスリープ状態でもアラームを発火させる
-            // 1秒後に起動するように設定
             alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.ELAPSED_REALTIME_WAKEUP,
-                    SystemClock.elapsedRealtime() + 1000, // 現在時刻から1秒後
+                    SystemClock.elapsedRealtime() + 1000,
                     restartPendingIntent
             );
-            Log.d(TAG, "Service restart scheduled via AlarmManager.");
+            Log.d(TAG, "サービス再起動を1秒後にスケジュールしました。");
         }
     }
 
     @Override
     public void onDestroy() {
-        super.onDestroy();
-        Log.d(TAG, "onDestroy");
-
-        // WakeLockを解放
-        if (wakeLock != null && wakeLock.isHeld()) {
-            wakeLock.release();
-            Log.d(TAG, "WakeLock released.");
-        }
-
-        // ヘルスチェックのRunnableを停止
+        Log.d(TAG, "WebSocketService onDestroy");
+        if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
         healthCheckHandler.removeCallbacks(healthCheckRunnable);
-
-        // ネットワークコールバックの登録を解除
-        if (connectivityManager != null && networkCallback != null) {
+        if (connectivityManager != null && networkCallback != null)
             connectivityManager.unregisterNetworkCallback(networkCallback);
-            Log.d(TAG, "NetworkCallback unregistered.");
-        }
-
-        // WebSocket接続を停止
-        if (p2pWebsocket != null) {
-            p2pWebsocket.stop();
-            p2pWebsocket = null;
-        }
-        if (wolfxWebsocket != null) {
-            wolfxWebsocket.stop();
-            wolfxWebsocket = null;
-        }
-        // TTSリソースを解放
+        if (p2pWebsocket != null) p2pWebsocket.stop();
+        if (wolfxWebsocket != null) wolfxWebsocket.stop();
         if (tts != null) {
             tts.stop();
             tts.shutdown();
-            tts = null;
         }
-
-        // フォアグラウンドサービスを停止
         stopForeground(true);
-
-        // サービスがdestroyされたときに、WorkManagerが動いている場合はそちらが再起動を試みる
-        // 必要であれば、ここでscheduleServiceRestart()を再度呼び出してAlarmManagerによる再起動も試みるが、
-        // onTaskRemoved()以外でのonDestroy()は明示的な停止の場合もあるため注意が必要
-        // 現状のWorkManagerとonTaskRemovedのAlarmManagerで十分な堅牢性があるはず
+        super.onDestroy();
     }
 
     @Nullable
     @Override
     public IBinder onBind(Intent intent) {
-        return null; // このサービスはバインドされない
+        return null;
     }
 
-    /**
-     * フォアグラウンドサービス通知のためのチャンネルを作成します。
-     * Android O (API 26) 以降で必要です。
-     */
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
-                    "WebSocket Service", // ユーザーに表示されるチャンネル名
-                    NotificationManager.IMPORTANCE_LOW // 低優先度で通知音が鳴らないようにする
+                    "WebSocketサービス",
+                    NotificationManager.IMPORTANCE_LOW
             );
-            channel.setDescription("WebSocket接続をバックグラウンドで維持します。");
-            channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC); // ロック画面での表示設定
-
-            NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            NotificationManager manager = getSystemService(NotificationManager.class);
             if (manager != null) manager.createNotificationChannel(channel);
         }
     }
 
-    /**
-     * フォアグラウンドサービスに表示される通知を作成します。
-     * ユーザーがタップするとMainActivityが開くように設定します。
-     * @return フォアグラウンドサービス通知オブジェクト。
-     */
     private Notification createNotification() {
-        Intent notificationIntent = new Intent(this, MainActivity.class);
-        notificationIntent.setAction(Intent.ACTION_MAIN);
-        notificationIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.setAction(Intent.ACTION_MAIN);
+        intent.addCategory(Intent.CATEGORY_LAUNCHER);
 
         PendingIntent pendingIntent = PendingIntent.getActivity(
-                this,
-                0, // リクエストコード
-                notificationIntent,
+                this, 0, intent,
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
                         ? PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
-                        : PendingIntent.FLAG_UPDATE_CURRENT);
+                        : PendingIntent.FLAG_UPDATE_CURRENT
+        );
 
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("WebSocket Service")
+                .setContentTitle("WebSocketサービス")
                 .setContentText("WebSocket接続を維持しています")
-                .setSmallIcon(R.drawable.koiyuresikakuicon) // 通知アイコンはres/drawableに配置してください
+                .setSmallIcon(R.drawable.koiyuresikakuicon)
                 .setContentIntent(pendingIntent)
-                .setPriority(NotificationCompat.PRIORITY_LOW) // 低優先度
-                .setOngoing(true) // ユーザーがスワイプで消せない永続的な通知
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setOngoing(true)
                 .build();
     }
 }

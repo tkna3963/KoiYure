@@ -22,27 +22,25 @@ public class ServiceUtils {
     public static boolean isServiceRunning(Context context, Class<?> serviceClass) {
         ActivityManager manager = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
         if (manager == null) {
-            Log.e(TAG, "ActivityManager is null. Cannot check service status.");
+            Log.e(TAG, "ActivityManagerが取得できません。サービス状態を確認できません。");
             return false;
         }
 
         // 実行中のすべてのサービスを取得
-        // getRunningServices()はAPIレベル26以降、自身のアプリのサービスのみを返す制限がある
-        // しかし、ここでは自身のWebSocketServiceをチェックするので問題ない
         List<ActivityManager.RunningServiceInfo> services = manager.getRunningServices(Integer.MAX_VALUE);
         if (services == null) {
-            Log.e(TAG, "No running services found by ActivityManager.");
+            Log.e(TAG, "実行中のサービスが見つかりません。");
             return false;
         }
 
         // 実行中のサービスリストを走査し、指定されたサービス名と一致するか確認
         for (ActivityManager.RunningServiceInfo service : services) {
             if (serviceClass.getName().equals(service.service.getClassName())) {
-                Log.d(TAG, serviceClass.getSimpleName() + " is running.");
+                Log.d(TAG, serviceClass.getSimpleName() + " は実行中です。");
                 return true;
             }
         }
-        Log.d(TAG, serviceClass.getSimpleName() + " is NOT running.");
+        Log.d(TAG, serviceClass.getSimpleName() + " は実行されていません。");
         return false;
     }
 }
