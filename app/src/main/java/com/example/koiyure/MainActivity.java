@@ -2,6 +2,7 @@ package com.example.koiyure;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -55,7 +56,6 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
         webView = findViewById(R.id.webView);
         WebSettings webSettings = webView.getSettings();
         webSettings.setJavaScriptEnabled(true);
-
         webSettings.setDomStorageEnabled(true);
         webSettings.setDatabaseEnabled(true);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -63,7 +63,6 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
         } else {
             CookieManager.getInstance().setAcceptCookie(true);
         }
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             WebView.setWebContentsDebuggingEnabled(true);
         }
@@ -73,15 +72,31 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 Log.d(TAG, "WebViewのページ読み込み完了: " + url);
+                NotiFunc.showNotification(MainActivity.this, "ページ読み込み完了", url, 1003);
                 sendMessageToWebView("onP2PStatusChange", String.valueOf(isP2PConnected));
                 sendMessageToWebView("onWolfxStatusChange", String.valueOf(isWolfxConnected));
             }
         });
         webView.loadUrl("file:///android_asset/MainIndex.html");
-
         webView.addJavascriptInterface(new WebAppInterface(this), "Android");
 
+        // ----------------------------------------
+        // インストール時のみ FCM トークン送信
+        // ----------------------------------------
+        SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+        boolean isFcmSent = prefs.getBoolean("fcm_token_sent", false);
+
+        if (!isFcmSent) {
+            MyFirebaseMessagingService fcmService = new MyFirebaseMessagingService();
+            fcmService.getTokenAndSendToDatabase();
+
+            prefs.edit().putBoolean("fcm_token_sent", true).apply();
+            Log.d(TAG, "FCMトークン送信済みフラグを保存しました。");
+        }
+
+        // ----------------------------------------
         // P2P WebSocket
+        // ----------------------------------------
         p2pWebsocket = new P2PWebsocket();
         p2pWebsocket.setListener(this);
         p2pWebsocket.start();

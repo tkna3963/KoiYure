@@ -1,0 +1,1 @@
+const localData = Android.getLocalData();

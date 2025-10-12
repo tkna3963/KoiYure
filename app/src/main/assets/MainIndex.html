@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="scripts.js"></script>
     <script src="P2P.js"></script>
+    <script src="Wolfx.js"></script>
     <link rel="stylesheet" href="Styles.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -43,8 +44,6 @@
     <!-- 情報メニュー -->
     <div id="infomenu">
         <h2>情報メニュー</h2>
-        <button id="showLocalDataBtn">ローカルデータを表示</button>
-        <div id="localDataDisplay"></div>
     </div>
 
     <!-- ボタン -->
@@ -81,16 +80,44 @@
 
         // --- データ管理 ---
         let AllWebsocketData = [];
-
         function MainTextarea(num) {
+            console.log("呼ばれた", num);
             const textarea = document.getElementById("maintextarea");
+            console.log("textarea", textarea);
             if (!textarea) return;
 
+            console.log("AllWebsocketData", AllWebsocketData);
             if (num >= 0 && num < AllWebsocketData.length) {
-                const value = AllWebsocketData[num];
-                textarea.value = value ?? "(空のメッセージ)";
+                let value = AllWebsocketData[num];
+
+                // 文字列ならオブジェクトに変換
+                if (typeof value === "string") {
+                    try {
+                        value = JSON.parse(value);
+                    } catch (e) {
+                        console.error("JSON変換失敗:", e, value);
+                        textarea.value = "(無効なデータ)";
+                        return;
+                    }
+                }
+
+                console.log("value", value);
+
+                if (value.code) {
+                    const out = formatToTelop(value);
+                    console.log("formatToTelop ->", out);
+                    textarea.value = out;
+                } else if (value.type) {
+                    const out = wolfxcoverter(value) ?? "(空のメッセージ)";
+                    console.log("wolfxcoverter ->", out);
+                    textarea.value = out;
+                } else {
+                    textarea.value = "(処理対象なし)";
+                    console.log("対象となる code/type がない");
+                }
             }
         }
+
 
         // --- データ受信時 (MainActivityから呼ばれる) ---
         function onP2PMessage(msg) {
@@ -115,16 +142,6 @@
         document.getElementById("pagebar").addEventListener("input", function () {
             const index = parseInt(this.value);
             MainTextarea(index);
-        });
-
-        // ローカルデータ表示ボタンのクリックイベント
-        document.getElementById("showLocalDataBtn").addEventListener("click", () => {
-            if (typeof Android !== 'undefined' && Android !== null) {
-                const localData = Android.getLocalData();
-                document.getElementById("localDataDisplay").textContent = localData;
-            } else {
-                document.getElementById("localDataDisplay").textContent = 'Android APIが利用できません。';
-            }
         });
 
         // --- WebSocket 接続状態表示関数 ---

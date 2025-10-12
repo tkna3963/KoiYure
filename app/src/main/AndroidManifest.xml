@@ -35,6 +35,14 @@
             </intent-filter>
         </activity>
         <service
+            android:name=".MyFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <service
             android:name=".WebSocketService"
             android:enabled="true"
             android:foregroundServiceType="dataSync"
@@ -55,8 +63,6 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <!-- Android 9 (API 28) 以降では、BOOT_COMPLETEDを受け取るには明示的なACTION_PACKAGE_RESTARTEDも必要になる場合がありますが、
-                     通常は不要です。 -->
             </intent-filter>
         </receiver>
     </application>

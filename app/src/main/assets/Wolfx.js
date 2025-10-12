@@ -1,17 +1,3 @@
-
-function loadJSON(filePath) {
-    const xhr = new XMLHttpRequest();
-    xhr.open('GET', filePath, false);
-    xhr.send();
-    if (xhr.status === 200) {
-        return JSON.parse(xhr.responseText);
-    } else {
-        console.error('Error loading JSON:', xhr.status, xhr.statusText);
-        return null;
-    }
-}
-
-
 // Wolfxデータ変換
 function WolxCon(data) {
     if (data.type === "jma_eew") {
