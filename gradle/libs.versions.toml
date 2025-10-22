@@ -13,6 +13,8 @@ googleFirebaseCrashlytics = "3.0.6"
 firebaseAnalytics = "23.0.0"
 firebaseMessaging = "25.0.1"
 firebaseDatabase = "22.0.1"
+firebaseAi = "17.4.0"
+firebaseMlVision = "24.1.0"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -26,6 +28,8 @@ firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashly
 firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics", version.ref = "firebaseAnalytics" }
 firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging", version.ref = "firebaseMessaging" }
 firebase-database = { group = "com.google.firebase", name = "firebase-database", version.ref = "firebaseDatabase" }
+firebase-ai = { group = "com.google.firebase", name = "firebase-ai", version.ref = "firebaseAi" }
+firebase-ml-vision = { group = "com.google.firebase", name = "firebase-ml-vision", version.ref = "firebaseMlVision" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

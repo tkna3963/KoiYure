@@ -27,15 +27,8 @@ import android.util.Log;
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
-import org.json.JSONArray;
-import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.Locale;
 
 public class WebSocketService extends Service implements P2PWebsocket.Listener, WolfxWebsocket.Listener {
@@ -156,8 +149,15 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
     @Override
     public void onP2PMessageReceived(String message) {
         Log.d(TAG, "P2Pメッセージ受信: " + message);
-        saveJsonToInternalStorage(message);
-        updateWidget(message);
+        try {
+            JSONObject json = new JSONObject(message); // ここで変換
+            P2Pcon converter = new P2Pcon();
+            String telopText = converter.convertToTelop(json); // JSONObjectを渡す
+            NotiFunc.showNotification(this, "KoiYue", telopText, 1);
+            updateWidget(message);
+        } catch (Exception e) {
+            Log.e(TAG, "JSON変換に失敗しました: " + e.getMessage());
+        }
     }
 
     @Override
@@ -168,58 +168,20 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
     @Override
     public void onWolfxMessageReceived(String message) {
         Log.d(TAG, "Wolfxメッセージ受信: " + message);
-        saveJsonToInternalStorage(message);
-        updateWidget(message);
+        try {
+            JSONObject json = new JSONObject(message); // JSONに変換
+            WolfxCon converter = new WolfxCon();
+            String telopText = converter.wolfxConverter(json); // JSONObjectを渡す
+            NotiFunc.showNotification(this, "KoiYue", telopText, 1);
+            updateWidget(message);
+        } catch (Exception e) {
+            Log.e(TAG, "Wolfx JSON変換に失敗しました: " + e.getMessage());
+        }
     }
 
     @Override
     public void onWolfxStatusChanged(boolean isConnected) {
         Log.d(TAG, "Wolfx接続状態: " + (isConnected ? "接続中" : "切断中"));
-    }
-
-    private void saveJsonToInternalStorage(String json) {
-        String fileName = "all_received_data.json";
-        JSONArray array;
-        String existing = loadJsonFromInternalStorage();
-        if (existing != null && !existing.isEmpty()) {
-            try {
-                array = new JSONArray(existing);
-            } catch (JSONException e) {
-                array = new JSONArray();
-                Log.w(TAG, "既存JSON読み込み失敗。新規JSONArrayを作成します。");
-            }
-        } else {
-            array = new JSONArray();
-        }
-
-        try {
-            array.put(new JSONObject(json));
-        } catch (JSONException e) {
-            Log.e(TAG, "JSON追加失敗", e);
-            return;
-        }
-
-        try (FileOutputStream fos = openFileOutput(fileName, Context.MODE_PRIVATE)) {
-            fos.write(array.toString().getBytes());
-            Log.d(TAG, "JSON配列として保存成功: " + array.toString());
-        } catch (IOException e) {
-            Log.e(TAG, "JSON保存失敗", e);
-        }
-    }
-
-    private String loadJsonFromInternalStorage() {
-        String fileName = "all_received_data.json";
-        try (FileInputStream fis = openFileInput(fileName);
-             InputStreamReader isr = new InputStreamReader(fis);
-             BufferedReader reader = new BufferedReader(isr)) {
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) sb.append(line);
-            return sb.toString();
-        } catch (IOException e) {
-            Log.w(TAG, "内部ストレージからJSON読み込み失敗", e);
-            return null;
-        }
     }
 
     private void updateWidget(String data) {
@@ -246,12 +208,22 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
         super.onTaskRemoved(rootIntent);
     }
 
+    /**
+     * Android 12以降でのクラッシュを防ぐための安全な再起動処理
+     */
     private void scheduleServiceRestart() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            Log.w(TAG, "Android 12以降ではサービス自動再起動をスキップします。");
+            return;
+        }
+
         Intent restartIntent = new Intent(getApplicationContext(), this.getClass());
         restartIntent.setPackage(getPackageName());
 
         PendingIntent restartPendingIntent = PendingIntent.getService(
-                this, 1, restartIntent,
+                this,
+                1,
+                restartIntent,
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
                         ? PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_ONE_SHOT
                         : PendingIntent.FLAG_ONE_SHOT
@@ -264,7 +236,7 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
                     SystemClock.elapsedRealtime() + 1000,
                     restartPendingIntent
             );
-            Log.d(TAG, "サービス再起動を1秒後にスケジュールしました。");
+            Log.d(TAG, "サービス再起動を1秒後にスケジュールしました。(Android 11以下)");
         }
     }
 
