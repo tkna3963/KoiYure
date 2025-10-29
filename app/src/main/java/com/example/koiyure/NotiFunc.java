@@ -35,7 +35,7 @@ public class NotiFunc {
         createChannelIfNeeded(nm, NotificationManager.IMPORTANCE_DEFAULT);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(R.drawable.koiyuresikakuicon)
+                .setSmallIcon(R.drawable.koisifavicon)
                 .setContentTitle(title)
                 .setContentText(message)
                 .setAutoCancel(true);
@@ -50,7 +50,7 @@ public class NotiFunc {
         createChannelIfNeeded(nm, NotificationManager.IMPORTANCE_LOW);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(R.drawable.koiyuresikakuicon)
+                .setSmallIcon(R.drawable.koisifavicon)
                 .setContentTitle(title)
                 .setContentText("Downloading...")
                 .setProgress(100, progress, false)
@@ -66,7 +66,7 @@ public class NotiFunc {
         createChannelIfNeeded(nm, NotificationManager.IMPORTANCE_DEFAULT);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(R.drawable.koiyuresikakuicon)
+                .setSmallIcon(R.drawable.koisifavicon)
                 .setContentTitle(title)
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(bigMessage))
                 .setAutoCancel(true);
@@ -81,7 +81,7 @@ public class NotiFunc {
         createChannelIfNeeded(nm, NotificationManager.IMPORTANCE_DEFAULT);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setSmallIcon(R.drawable.koisifavicon)
                 .setContentTitle(title)
                 .setContentText(message)
                 .setStyle(new NotificationCompat.BigPictureStyle()
@@ -98,7 +98,7 @@ public class NotiFunc {
         createChannelIfNeeded(nm, NotificationManager.IMPORTANCE_LOW);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setSmallIcon(R.drawable.koisifavicon)
                 .setContentTitle(title)
                 .setContentText(message)
                 .setOngoing(true)

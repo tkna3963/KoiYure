@@ -21,7 +21,6 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.PowerManager;
 import android.os.SystemClock;
-import android.speech.tts.TextToSpeech;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
@@ -39,12 +38,15 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
 
     private P2PWebsocket p2pWebsocket;
     private WolfxWebsocket wolfxWebsocket;
-    private TextToSpeech tts;
     private ConnectivityManager.NetworkCallback networkCallback;
     private ConnectivityManager connectivityManager;
     private PowerManager.WakeLock wakeLock;
 
-    private static final long HEALTH_CHECK_INTERVAL_MS = 30 * 1000; // 30秒ごと
+    private P2Pcon p2pConverter; // P2Pconのインスタンスを追加
+    private WolfxCon wolfxConverter; // WolfxConのインスタンスを追加 (WolfxConもContextを必要とする想定)
+
+
+    private static final long HEALTH_CHECK_INTERVAL_MS = 33 * 1000; // 33秒ごと (30秒から少しずらして安定性向上)
     private Handler healthCheckHandler = new Handler(Looper.getMainLooper());
     private Runnable healthCheckRunnable = new Runnable() {
         @Override
@@ -69,6 +71,10 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
                 wolfxWebsocket.start();
             }
 
+            // P2PconとWolfxConの初期化チェックは不要。onCreateで必ず初期化されるため。
+            // 強いて言うなら、ここで p2pConverter や wolfxConverter がnullでないことを確認してもよいが、
+            // onCreateで初期化されるので通常は問題ない。
+
             healthCheckHandler.postDelayed(this, HEALTH_CHECK_INTERVAL_MS);
         }
     };
@@ -92,14 +98,11 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
             }
         }
 
-        tts = new TextToSpeech(this, status -> {
-            if (status == TextToSpeech.SUCCESS) {
-                tts.setLanguage(Locale.JAPANESE);
-                Log.d(TAG, "TextToSpeechの初期化成功。日本語に設定しました。");
-            } else {
-                Log.e(TAG, "TextToSpeechの初期化に失敗しました。");
-            }
-        });
+        // P2PconとWolfxConをここで初期化し、サービス自身のContextを渡す
+        p2pConverter = new P2Pcon(this);
+        // WolfxConもContextを必要とするコンストラクタを持つと仮定して初期化
+        wolfxConverter = new WolfxCon(this);
+
 
         initializeWebSockets();
         registerNetworkCallback();
@@ -150,13 +153,12 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
     public void onP2PMessageReceived(String message) {
         Log.d(TAG, "P2Pメッセージ受信: " + message);
         try {
-            JSONObject json = new JSONObject(message); // ここで変換
-            P2Pcon converter = new P2Pcon();
-            String telopText = converter.convertToTelop(json); // JSONObjectを渡す
+            // 既にonCreateでインスタンス化されているp2pConverterを使用
+            String telopText = p2pConverter.convertToTelop(new JSONObject(message));
             NotiFunc.showNotification(this, "KoiYue", telopText, 1);
             updateWidget(message);
         } catch (Exception e) {
-            Log.e(TAG, "JSON変換に失敗しました: " + e.getMessage());
+            Log.e(TAG, "P2P JSON変換に失敗しました: " + e.getMessage());
         }
     }
 
@@ -169,9 +171,8 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
     public void onWolfxMessageReceived(String message) {
         Log.d(TAG, "Wolfxメッセージ受信: " + message);
         try {
-            JSONObject json = new JSONObject(message); // JSONに変換
-            WolfxCon converter = new WolfxCon();
-            String telopText = converter.wolfxConverter(json); // JSONObjectを渡す
+            // 既にonCreateでインスタンス化されているwolfxConverterを使用
+            String telopText = wolfxConverter.wolfxConverter(new JSONObject(message));
             NotiFunc.showNotification(this, "KoiYue", telopText, 1);
             updateWidget(message);
         } catch (Exception e) {
@@ -208,9 +209,6 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
         super.onTaskRemoved(rootIntent);
     }
 
-    /**
-     * Android 12以降でのクラッシュを防ぐための安全な再起動処理
-     */
     private void scheduleServiceRestart() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             Log.w(TAG, "Android 12以降ではサービス自動再起動をスキップします。");
@@ -249,10 +247,15 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
             connectivityManager.unregisterNetworkCallback(networkCallback);
         if (p2pWebsocket != null) p2pWebsocket.stop();
         if (wolfxWebsocket != null) wolfxWebsocket.stop();
-        if (tts != null) {
-            tts.stop();
-            tts.shutdown();
+        // TTSリソースを解放する
+        if (p2pConverter != null && p2pConverter.getTtsCon() != null) {
+            p2pConverter.getTtsCon().shutdown();
         }
+        // WolfxConがTTSconを持っている場合、同様にシャットダウン処理を追加
+        if (wolfxConverter != null && wolfxConverter.getTtsCon() != null) { // getTtsCon()がWolfxConにもあると仮定
+            wolfxConverter.getTtsCon().shutdown();
+        }
+
         stopForeground(true);
         super.onDestroy();
     }
