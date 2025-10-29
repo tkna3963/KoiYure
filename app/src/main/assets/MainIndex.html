@@ -29,13 +29,13 @@
         <hr>
         <h3>WebSocket 接続状態</h3>
         <div>
-            <h4>P2P Quake</h4>
+            <h4>P2P地震情報 API</h4>
             <span id="p2pStatusIndicator" class="status-indicator status-disconnected"></span>
             <span id="p2pStatusText">切断</span>
         </div>
 
         <div>
-            <h4>Wolfx JMA EEW</h4>
+            <h4>Wolfx　JMA API</h4>
             <span id="wolfxStatusIndicator" class="status-indicator status-disconnected"></span>
             <span id="wolfxStatusText">切断</span>
         </div>
@@ -138,13 +138,11 @@
             pagebar.value = AllWebsocketData.length > 0 ? AllWebsocketData.length - 1 : 0;
         }
 
-        // --- スライダー操作 ---
         document.getElementById("pagebar").addEventListener("input", function () {
             const index = parseInt(this.value);
             MainTextarea(index);
         });
 
-        // --- WebSocket 接続状態表示関数 ---
         function updateStatusDisplay(indicatorId, textId, isConnected) {
             const indicatorElement = document.getElementById(indicatorId);
             const textElement = document.getElementById(textId);
@@ -162,19 +160,16 @@
             }
         }
 
-        // AndroidからP2P WebSocketの状態変更通知を受け取るグローバル関数
         function onP2PStatusChange(isConnectedStr) {
             const isConnected = (isConnectedStr === 'true');
             updateStatusDisplay('p2pStatusIndicator', 'p2pStatusText', isConnected);
         }
 
-        // AndroidからWolfx WebSocketの状態変更通知を受け取るグローバル関数
         function onWolfxStatusChange(isConnectedStr) {
             const isConnected = (isConnectedStr === 'true');
             updateStatusDisplay('wolfxStatusIndicator', 'wolfxStatusText', isConnected);
         }
 
-        // WebViewがロードされたときに初期状態を確認
         window.onload = function () {
             if (typeof Android !== 'undefined' && Android !== null) {
                 updateStatusDisplay('p2pStatusIndicator', 'p2pStatusText', Android.isP2PWebSocketConnected());

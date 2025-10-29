@@ -1,16 +1,15 @@
 package com.example.koiyure;
 
-import android.content.Context; // Contextをインポート
-import android.util.Log; // Logをインポート
+import android.content.Context;
+import android.util.Log;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 public class WolfxCon {
 
-    private static final String TAG = "WolfxCon"; // Logタグを追加
-    private TTScon ttsCon; // TTSconを保持するためのフィールドを追加
-    private Context context; // Contextを保持するためのフィールドを追加
+    private static final String TAG = "WolfxCon";
+    private Context context;
 
     /**
      * WolfxConのコンストラクタ
@@ -18,27 +17,15 @@ public class WolfxCon {
      */
     public WolfxCon(Context context) {
         this.context = context;
-        // TTSconを初期化。P2Pconと同様にTTSも準備される。
-        ttsCon = new TTScon(this.context);
         Log.d(TAG, "WolfxCon initialized with Context.");
     }
 
-    /**
-     * WolfxConで使用しているTTSconインスタンスを返します。
-     * 必要に応じて、アクティビティのonDestroyなどでTTSをシャットダウンするために使用できます。
-     * @return このWolfxConインスタンスが使用するTTSconオブジェクト
-     */
-    public TTScon getTtsCon() {
-        return ttsCon;
-    }
-
-    // Wolfxデータ変換 (元のWolxConメソッド、用途が不明なため private に変更し、TTSは行わない)
+    // Wolfxデータ変換
     // このメソッドの戻り値のObject[]は型安全ではないため、必要であれば専用のデータクラスを作成することを推奨します。
     private Object[] extractWolfxData(JSONObject data) {
         String type = data.optString("type", "");
 
         if ("jma_eew".equals(type)) {
-            // スケールミスを修正: Magunitude -> Magnitude
             return new Object[]{
                     data.optString("type", ""),                      // 1
                     data.optString("Title", ""),                     // 2
@@ -64,7 +51,7 @@ public class WolfxCon {
                     data.optInt("Serial", 0),                        // 21
                     data.optDouble("Latitude", 0),                   // 22
                     data.optDouble("Longitude", 0),                  // 23
-                    data.optDouble("Magnitude", 0),                 // 24 (修正)
+                    data.optDouble("Magnitude", 0),                 // 24
                     data.optDouble("Depth", 0),                      // 25
                     data.opt("WarnArea") instanceof JSONArray ? ((JSONArray) data.opt("WarnArea")).optJSONObject(0) != null && ((JSONArray) data.opt("WarnArea")).optJSONObject(0).optBoolean("Arrive", false) : (data.optJSONObject("WarnArea") != null && data.optJSONObject("WarnArea").optBoolean("Arrive", false)), // 26
                     data.optBoolean("isSea", false),                 // 27
@@ -85,8 +72,8 @@ public class WolfxCon {
         }
     }
 
-    // Wolfx文字列変換 (TTSによる読み上げ機能を追加)
-    public String wolfxConverter(JSONObject data) throws JSONException { // staticを削除
+    // Wolfx文字列変換
+    public String wolfxConverter(JSONObject data) throws JSONException {
         String type = data.optString("type", "");
         String telopText;
 
@@ -114,7 +101,7 @@ public class WolfxCon {
             msg.append("震源地: ").append(data.optString("Hypocenter", "不明"))
                     .append(" (緯度: ").append(data.optDouble("Latitude", 0))
                     .append(", 経度: ").append(data.optDouble("Longitude", 0)).append(")\n");
-            msg.append("マグニチュード: M").append(data.optDouble("Magnitude", 0)) // スペルミス修正
+            msg.append("マグニチュード: M").append(data.optDouble("Magnitude", 0))
                     .append(" 深さ: ").append(data.optDouble("Depth", 0)).append("km\n");
             msg.append("最大震度: ").append(data.optString("MaxIntensity", "不明")).append("\n");
 
@@ -154,7 +141,7 @@ public class WolfxCon {
                     } else {
                         msg.append("警報対象地域: なし\n");
                     }
-                } else if (warnObj instanceof JSONObject) { // JSONObjectの場合も処理を追加
+                } else if (warnObj instanceof JSONObject) {
                     JSONObject area = (JSONObject) warnObj;
                     msg.append("地域: ").append(area.optString("Chiiki", "不明")).append("\n")
                             .append("予測震度: ").append(area.optString("Shindo1", "不明"))
@@ -184,16 +171,6 @@ public class WolfxCon {
             // 未対応タイプ
             telopText = "【未対応のデータ】\nタイプ: " + type + "\n内容:\n" + data.toString(2);
         }
-
-        // TTSによる読み上げ
-        if (ttsCon.isInitialized()) {
-            if("jma_eew".equals(type)) {
-                ttsCon.speak(telopText);
-            }
-        } else {
-            Log.e(TAG, "TTS未初期化のため読み上げできません: " + telopText);
-        }
-
         return telopText;
     }
 }

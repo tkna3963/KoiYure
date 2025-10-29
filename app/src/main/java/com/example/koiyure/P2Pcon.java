@@ -1,14 +1,14 @@
 package com.example.koiyure;
 
-import android.content.Context; // Contextをインポート
+import android.content.Context;
 import org.json.JSONObject;
 import org.json.JSONArray;
 
 import java.util.Iterator;
 
 public class P2Pcon {
-    private TTScon ttsCon;
-    private Context context; // Contextを保持するためのフィールドを追加
+    private Context context;
+    private TTScon ttscon;
 
     /**
      * P2Pconのコンストラクタ
@@ -16,19 +16,18 @@ public class P2Pcon {
      */
     public P2Pcon(Context context) {
         this.context = context;
-        // TTSconを初期化。P2Pconのインスタンスが生成されるときにTTSも準備される。
-        ttsCon = new TTScon(this.context);
+        this.ttscon = new TTScon(context);
     }
 
-
     /**
-     * JSONデータを解析してテロップに変換し、TTSで読み上げる
+     * JSONデータを解析してテロップに変換し、必要に応じて読み上げ
      * @param json P2P地震情報のJSONオブジェクト
      * @return テロップ文字列
      */
-    public String convertToTelop(JSONObject json) { // staticを削除
+    public String convertToTelop(JSONObject json) {
         int code = json.optInt("code");
         String telop;
+        boolean shouldSpeak = true; // 555以外は読み上げる
 
         switch (code) {
             case 551:
@@ -45,6 +44,7 @@ public class P2Pcon {
                 break;
             case 555:
                 telop = formatAreapeersToTelop(json);
+                shouldSpeak = false; // 555は読み上げない
                 break;
             case 556:
                 telop = formatEEWToTelop(json);
@@ -60,32 +60,74 @@ public class P2Pcon {
                 break;
         }
 
-        // P2Pピア分布情報(555)以外は読み上げる
-        // ttsConインスタンスのisInitializedメソッドで初期化状態を確認
-        if (code != 555) {
-            if (ttsCon.isInitialized()) { // TTSconのisInitializedメソッドを使用
-                ttsCon.speak(telop);
-            } else {
-                System.out.println("TTS未初期化: " + telop);
-                // TTSが未初期化の場合のハンドリング。
-                // 例: ログ出力のみ、あるいは後で初期化されたときに読み上げるキューに保存するなど
-            }
+        // 555以外を読み上げ
+        if (shouldSpeak) {
+            speakTelop(telop);
         }
 
         return telop;
     }
 
     /**
-     * P2Pconで使用しているTTSconインスタンスを返します。
-     * 必要に応じて、アクティビティのonDestroyなどでTTSをシャットダウンするために使用できます。
-     * @return このP2Pconインスタンスが使用するTTSconオブジェクト
+     * テロップを読み上げる（簡潔版に整形）
+     * @param telop 読み上げるテロップ
      */
-    public TTScon getTtsCon() {
-        return ttsCon;
+    private void speakTelop(String telop) {
+        if (ttscon != null && ttscon.isReady()) {
+            // 読み上げ用に簡略化したテキストを生成
+            String speechText = createSpeechText(telop);
+            ttscon.speak(speechText);
+        }
+    }
+
+    /**
+     * テロップから読み上げ用テキストを生成
+     * @param telop 元のテロップ
+     * @return 読み上げ用テキスト
+     */
+    private String createSpeechText(String telop) {
+        // 簡略化したテキストを返す（必要に応じてカスタマイズ）
+        // 例：詳細情報を省略して重要な情報のみ読み上げ
+        return telop
+                .replaceAll("受信日時:.*\n", "") // 受信日時は省略
+                .replaceAll("発表元:.*\n", "")   // 発表元は省略
+                .replaceAll("【", "")
+                .replaceAll("】", "。")
+                .replaceAll("：", "、");
+    }
+
+    /**
+     * TTSの設定を変更
+     * @param pitch ピッチ（0.5～2.0）
+     * @param rate 速度（0.5～2.0）
+     */
+    public void setTTSSettings(float pitch, float rate) {
+        if (ttscon != null) {
+            ttscon.setPitch(pitch);
+            ttscon.setSpeechRate(rate);
+        }
+    }
+
+    /**
+     * 読み上げを停止
+     */
+    public void stopSpeaking() {
+        if (ttscon != null) {
+            ttscon.stop();
+        }
+    }
+
+    /**
+     * リソースの解放
+     */
+    public void shutdown() {
+        if (ttscon != null) {
+            ttscon.shutdown();
+        }
     }
 
     // ---- 地震情報（551）----
-    private String formatJMAQuakeToTelop(JSONObject jmaQuake) { // staticを削除
+    private String formatJMAQuakeToTelop(JSONObject jmaQuake) {
         StringBuilder sb = new StringBuilder();
         sb.append("【地震情報】\n");
         sb.append("受信日時: ").append(jmaQuake.optString("time", "不明")).append("\n");
@@ -140,7 +182,7 @@ public class P2Pcon {
     }
 
     // ---- 津波予報（552）----
-    private String formatJMATsunamisToTelop(JSONObject json) { // staticを削除
+    private String formatJMATsunamisToTelop(JSONObject json) {
         StringBuilder sb = new StringBuilder();
         sb.append("【津波予報】\n");
         sb.append("受信日時: ").append(json.optString("time", "不明")).append("\n");
@@ -177,29 +219,47 @@ public class P2Pcon {
     }
 
     // ---- 津波解除（5520）----
-    private String formatJMATsunamis5520ToTelop(JSONObject json) { // staticを削除
+    private String formatJMATsunamis5520ToTelop(JSONObject json) {
         return "【津波予報解除】\n受信日時: " + json.optString("time", "不明");
     }
 
     // ---- 緊急地震速報発表検出（554）----
-    private String formatEEWDetectionToTelop(JSONObject json) { // staticを削除
+    private String formatEEWDetectionToTelop(JSONObject json) {
         return "【緊急地震速報 発表検出】\n検出種類: " + eewDetectionTypeToString(json.optString("type", "不明")) +
                 "\n受信日時: " + json.optString("time", "不明");
     }
 
     // ---- P2Pピア分布（555）----
-    private String formatAreapeersToTelop(JSONObject json) { // staticを削除
+    private String formatAreapeersToTelop(JSONObject json) {
         JSONArray areas = json.optJSONArray("areas");
         StringBuilder sb = new StringBuilder();
-        sb.append("【P2P地震情報ネットワーク】\n受信日時: ").append(json.optString("time", "不明")).append("\n");
+        sb.append("【P2P地震情報ネットワーク】\n");
+        sb.append("受信日時: ").append(json.optString("time", "不明")).append("\n");
+
         if (areas != null) {
             sb.append("接続地域数: ").append(areas.length()).append("\n");
+
+            // 各地域の情報を追加
+            for (int i = 0; i < areas.length(); i++) {
+                JSONObject area = areas.optJSONObject(i);
+                if (area != null) {
+                    int id = area.optInt("id", -1);
+                    int peer = area.optInt("peer", 0);
+                    sb.append("・地域コード: ").append(id)
+                            .append(" / ピア数: ").append(peer)
+                            .append("\n");
+                }
+            }
+        } else {
+            sb.append("地域情報がありません。\n");
         }
+
         return sb.toString();
     }
 
+
     // ---- 緊急地震速報（556）----
-    private String formatEEWToTelop(JSONObject json) { // staticを削除
+    private String formatEEWToTelop(JSONObject json) {
         StringBuilder sb = new StringBuilder();
         sb.append("【緊急地震速報（警報）】\n");
         sb.append("受信日時: ").append(json.optString("time", "不明")).append("\n");
@@ -249,13 +309,13 @@ public class P2Pcon {
     }
 
     // ---- 地震感知情報（561）----
-    private String formatUserquakeToTelop(JSONObject json) { // staticを削除
+    private String formatUserquakeToTelop(JSONObject json) {
         return "【地震感知情報】\n地域コード: " + json.optInt("area", -1) +
                 "\n受信日時: " + json.optString("time", "不明");
     }
 
     // ---- 感知評価（9611）----
-    private String formatUserquakeEvaluationToTelop(JSONObject json) { // staticを削除
+    private String formatUserquakeEvaluationToTelop(JSONObject json) {
         StringBuilder sb = new StringBuilder();
         sb.append("【地震感知情報評価結果】\n");
         sb.append("評価日時: ").append(json.optString("time", "不明")).append("\n");
@@ -283,8 +343,6 @@ public class P2Pcon {
     }
 
     // ---- 共通補助メソッド ----
-    // これらはTTSConに直接依存しないため、もし外部からも利用する可能性があるならstaticに戻しても良いですが、
-    // 現在の設計ではP2Pconインスタンスからのみ利用されるため、非staticのままでも問題ありません。
     private String scaleToString(int scale) {
         switch (scale) {
             case 10: return "震度1";

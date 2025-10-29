@@ -248,13 +248,6 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
         if (p2pWebsocket != null) p2pWebsocket.stop();
         if (wolfxWebsocket != null) wolfxWebsocket.stop();
         // TTSリソースを解放する
-        if (p2pConverter != null && p2pConverter.getTtsCon() != null) {
-            p2pConverter.getTtsCon().shutdown();
-        }
-        // WolfxConがTTSconを持っている場合、同様にシャットダウン処理を追加
-        if (wolfxConverter != null && wolfxConverter.getTtsCon() != null) { // getTtsCon()がWolfxConにもあると仮定
-            wolfxConverter.getTtsCon().shutdown();
-        }
 
         stopForeground(true);
         super.onDestroy();
