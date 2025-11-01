@@ -235,9 +235,8 @@ public class P2Pcon {
         StringBuilder sb = new StringBuilder();
         sb.append("【P2P地震情報ネットワーク】\n");
         sb.append("受信日時: ").append(json.optString("time", "不明")).append("\n");
-
+        int AllpeerNum=0;
         if (areas != null) {
-            sb.append("接続地域数: ").append(areas.length()).append("\n");
 
             // 各地域の情報を追加
             for (int i = 0; i < areas.length(); i++) {
@@ -248,7 +247,9 @@ public class P2Pcon {
                     sb.append("・地域コード: ").append(id)
                             .append(" / ピア数: ").append(peer)
                             .append("\n");
+                    AllpeerNum+=peer;
                 }
+                sb.append("P2P地震情報ネットワーク全体のピア数: ").append(AllpeerNum);
             }
         } else {
             sb.append("地域情報がありません。\n");

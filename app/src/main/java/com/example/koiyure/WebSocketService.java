@@ -44,6 +44,7 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
 
     private P2Pcon p2pConverter; // P2Pconのインスタンスを追加
     private WolfxCon wolfxConverter; // WolfxConのインスタンスを追加 (WolfxConもContextを必要とする想定)
+    private Cache cache = Cache.getInstance();
 
 
     private static final long HEALTH_CHECK_INTERVAL_MS = 33 * 1000; // 33秒ごと (30秒から少しずらして安定性向上)
@@ -70,11 +71,6 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
                 wolfxWebsocket.setListener(WebSocketService.this);
                 wolfxWebsocket.start();
             }
-
-            // P2PconとWolfxConの初期化チェックは不要。onCreateで必ず初期化されるため。
-            // 強いて言うなら、ここで p2pConverter や wolfxConverter がnullでないことを確認してもよいが、
-            // onCreateで初期化されるので通常は問題ない。
-
             healthCheckHandler.postDelayed(this, HEALTH_CHECK_INTERVAL_MS);
         }
     };
@@ -98,12 +94,8 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
             }
         }
 
-        // P2PconとWolfxConをここで初期化し、サービス自身のContextを渡す
         p2pConverter = new P2Pcon(this);
-        // WolfxConもContextを必要とするコンストラクタを持つと仮定して初期化
         wolfxConverter = new WolfxCon(this);
-
-
         initializeWebSockets();
         registerNetworkCallback();
         healthCheckHandler.postDelayed(healthCheckRunnable, HEALTH_CHECK_INTERVAL_MS);
@@ -153,7 +145,7 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
     public void onP2PMessageReceived(String message) {
         Log.d(TAG, "P2Pメッセージ受信: " + message);
         try {
-            // 既にonCreateでインスタンス化されているp2pConverterを使用
+            cache.add("P2P",message);
             String telopText = p2pConverter.convertToTelop(new JSONObject(message));
             NotiFunc.showNotification(this, "KoiYue", telopText, 1);
             updateWidget(message);
@@ -171,7 +163,7 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
     public void onWolfxMessageReceived(String message) {
         Log.d(TAG, "Wolfxメッセージ受信: " + message);
         try {
-            // 既にonCreateでインスタンス化されているwolfxConverterを使用
+            cache.add("Wolfx",message);
             String telopText = wolfxConverter.wolfxConverter(new JSONObject(message));
             NotiFunc.showNotification(this, "KoiYue", telopText, 1);
             updateWidget(message);

@@ -31,6 +31,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.TimeUnit;
 
@@ -46,6 +47,7 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
 
     private boolean isP2PConnected = false;
     private boolean isWolfxConnected = false;
+    private Cache cache = Cache.getInstance();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -72,26 +74,23 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 Log.d(TAG, "WebViewのページ読み込み完了: " + url);
+
+                List<String> P2PCache = cache.getMessages("P2P");
+                List<String> WolfxCache = cache.getMessages("Wolfx");
+                //バックグラウンドで受信したものをWebViewに送信
+                for (String message : P2PCache) {
+                    sendMessageToWebView("onP2PMessage", message);
+                }
+                for (String message : WolfxCache) {
+                    sendMessageToWebView("onWolfxMessage", message);
+                }
+                cache.clearAll();
                 sendMessageToWebView("onP2PStatusChange", String.valueOf(isP2PConnected));
                 sendMessageToWebView("onWolfxStatusChange", String.valueOf(isWolfxConnected));
             }
         });
         webView.loadUrl("file:///android_asset/MainIndex.html");
         webView.addJavascriptInterface(new WebAppInterface(this), "Android");
-
-        // ----------------------------------------
-        // インストール時のみ FCM トークン送信
-        // ----------------------------------------
-        SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
-        boolean isFcmSent = prefs.getBoolean("fcm_token_sent", false);
-
-        if (!isFcmSent) {
-            MyFirebaseMessagingService fcmService = new MyFirebaseMessagingService();
-            fcmService.getTokenAndSendToDatabase();
-
-            prefs.edit().putBoolean("fcm_token_sent", true).apply();
-            Log.d(TAG, "FCMトークン送信済みフラグを保存しました。");
-        }
 
         // ----------------------------------------
         // P2P WebSocket
@@ -197,27 +196,6 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
     }
 
     // ------------------------------
-    // 内部ストレージ読み込み
-    // ------------------------------
-    private String loadJsonFromInternalStorage() {
-        String fileName = "all_received_data.json";
-        try (FileInputStream fis = openFileInput(fileName);
-             InputStreamReader isr = new InputStreamReader(fis);
-             BufferedReader reader = new BufferedReader(isr)) {
-            StringBuilder stringBuilder = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                stringBuilder.append(line);
-            }
-            Log.d(TAG, "内部ストレージからJSONデータを読み込みました: " + fileName);
-            return stringBuilder.toString();
-        } catch (IOException e) {
-            Log.e(TAG, "JSONデータの読み込みに失敗しました。", e);
-            return null;
-        }
-    }
-
-    // ------------------------------
     // バッテリー最適化対応
     // ------------------------------
     private void requestIgnoreBatteryOptimizations() {
@@ -300,10 +278,9 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
         }
 
         @android.webkit.JavascriptInterface
-        public String getLocalData() {
-            Log.d(TAG, "WebViewからgetLocalData()が呼ばれました。");
-            String data = mActivity.loadJsonFromInternalStorage();
-            return data != null ? data : "データがありません";
+        public String CacheReturn(){
+            List<String> types = cache.getAllMessages();
+            return types.toString();
         }
 
         @android.webkit.JavascriptInterface
