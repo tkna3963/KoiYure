@@ -11,63 +11,65 @@ public class WolfxCon {
     private static final String TAG = "WolfxCon";
     private Context context;
 
+    // ★ 追加: TTSconのインスタンスを保持
+    private TTScon ttscon;
+
     /**
      * WolfxConのコンストラクタ
      * @param context アプリケーションのContext
      */
     public WolfxCon(Context context) {
         this.context = context;
-        Log.d(TAG, "WolfxCon initialized with Context.");
+        this.ttscon = new TTScon(context); // ★ 追加: TTS初期化
+        Log.d(TAG, "WolfxCon initialized with Context and TTS.");
     }
 
     // Wolfxデータ変換
-    // このメソッドの戻り値のObject[]は型安全ではないため、必要であれば専用のデータクラスを作成することを推奨します。
     private Object[] extractWolfxData(JSONObject data) {
         String type = data.optString("type", "");
 
         if ("jma_eew".equals(type)) {
             return new Object[]{
-                    data.optString("type", ""),                      // 1
-                    data.optString("Title", ""),                     // 2
-                    data.optString("CodeType", ""),                  // 3
-                    data.optJSONObject("Issue") != null ? data.optJSONObject("Issue").optString("Source", "") : "", // 4
-                    data.optJSONObject("Issue") != null ? data.optJSONObject("Issue").optString("Status", "") : "", // 5
-                    data.optString("EventID", ""),                   // 6
-                    data.optString("AnnouncedTime", ""),              // 7
-                    data.optString("OriginTime", ""),                 // 8
-                    data.optString("Hypocenter", ""),                 // 9
-                    data.optString("MaxIntensity", ""),               // 10
-                    data.optJSONObject("Accuracy") != null ? data.optJSONObject("Accuracy").optString("Epicenter", "") : "", // 11
-                    data.optJSONObject("Accuracy") != null ? data.optJSONObject("Accuracy").optString("Depth", "") : "",     // 12
-                    data.optJSONObject("Accuracy") != null ? data.optJSONObject("Accuracy").optString("Magnitude", "") : "", // 13
-                    data.optJSONObject("MaxIntChange") != null ? data.optJSONObject("MaxIntChange").optString("String", "") : "", // 14
-                    data.optJSONObject("MaxIntChange") != null ? data.optJSONObject("MaxIntChange").optString("Reason", "") : "", // 15
-                    // WarnAreaは配列の場合があるので、最初の要素のみ取得するか、全体を文字列化するか検討
-                    data.opt("WarnArea") instanceof JSONArray ? ((JSONArray) data.opt("WarnArea")).optJSONObject(0) != null ? ((JSONArray) data.opt("WarnArea")).optJSONObject(0).optString("Chiiki", "") : "" : (data.optJSONObject("WarnArea") != null ? data.optJSONObject("WarnArea").optString("Chiiki", "") : ""), // 16
-                    data.opt("WarnArea") instanceof JSONArray ? ((JSONArray) data.opt("WarnArea")).optJSONObject(0) != null ? ((JSONArray) data.opt("WarnArea")).optJSONObject(0).optString("Shindo1", "") : "" : (data.optJSONObject("WarnArea") != null ? data.optJSONObject("WarnArea").optString("Shindo1", "") : ""), // 17
-                    data.opt("WarnArea") instanceof JSONArray ? ((JSONArray) data.opt("WarnArea")).optJSONObject(0) != null ? ((JSONArray) data.opt("WarnArea")).optJSONObject(0).optString("Shindo2", "") : "" : (data.optJSONObject("WarnArea") != null ? data.optJSONObject("WarnArea").optString("Shindo2", "") : ""), // 18
-                    data.opt("WarnArea") instanceof JSONArray ? ((JSONArray) data.opt("WarnArea")).optJSONObject(0) != null ? ((JSONArray) data.opt("WarnArea")).optJSONObject(0).optString("Time", "") : "" : (data.optJSONObject("WarnArea") != null ? data.optJSONObject("WarnArea").optString("Time", "") : ""), // 19
-                    data.opt("WarnArea") instanceof JSONArray ? ((JSONArray) data.opt("WarnArea")).optJSONObject(0) != null ? ((JSONArray) data.opt("WarnArea")).optJSONObject(0).optString("Type", "") : "" : (data.optJSONObject("WarnArea") != null ? data.optJSONObject("WarnArea").optString("Type", "") : ""), // 20
-                    data.optInt("Serial", 0),                        // 21
-                    data.optDouble("Latitude", 0),                   // 22
-                    data.optDouble("Longitude", 0),                  // 23
-                    data.optDouble("Magnitude", 0),                 // 24
-                    data.optDouble("Depth", 0),                      // 25
-                    data.opt("WarnArea") instanceof JSONArray ? ((JSONArray) data.opt("WarnArea")).optJSONObject(0) != null && ((JSONArray) data.opt("WarnArea")).optJSONObject(0).optBoolean("Arrive", false) : (data.optJSONObject("WarnArea") != null && data.optJSONObject("WarnArea").optBoolean("Arrive", false)), // 26
-                    data.optBoolean("isSea", false),                 // 27
-                    data.optBoolean("isTraining", false),            // 28
-                    data.optBoolean("isAssumption", false),          // 29
-                    data.optBoolean("isWarn", false),                // 30
-                    data.optBoolean("isFinal", false),               // 31
-                    data.optBoolean("isCancel", false),              // 32
-                    data.optString("OriginalText", "")               // 33
+                    data.optString("type", ""),
+                    data.optString("Title", ""),
+                    data.optString("CodeType", ""),
+                    data.optJSONObject("Issue") != null ? data.optJSONObject("Issue").optString("Source", "") : "",
+                    data.optJSONObject("Issue") != null ? data.optJSONObject("Issue").optString("Status", "") : "",
+                    data.optString("EventID", ""),
+                    data.optString("AnnouncedTime", ""),
+                    data.optString("OriginTime", ""),
+                    data.optString("Hypocenter", ""),
+                    data.optString("MaxIntensity", ""),
+                    data.optJSONObject("Accuracy") != null ? data.optJSONObject("Accuracy").optString("Epicenter", "") : "",
+                    data.optJSONObject("Accuracy") != null ? data.optJSONObject("Accuracy").optString("Depth", "") : "",
+                    data.optJSONObject("Accuracy") != null ? data.optJSONObject("Accuracy").optString("Magnitude", "") : "",
+                    data.optJSONObject("MaxIntChange") != null ? data.optJSONObject("MaxIntChange").optString("String", "") : "",
+                    data.optJSONObject("MaxIntChange") != null ? data.optJSONObject("MaxIntChange").optString("Reason", "") : "",
+                    data.opt("WarnArea") instanceof JSONArray ? ((JSONArray) data.opt("WarnArea")).optJSONObject(0) != null ? ((JSONArray) data.opt("WarnArea")).optJSONObject(0).optString("Chiiki", "") : "" : (data.optJSONObject("WarnArea") != null ? data.optJSONObject("WarnArea").optString("Chiiki", "") : ""),
+                    data.opt("WarnArea") instanceof JSONArray ? ((JSONArray) data.opt("WarnArea")).optJSONObject(0) != null ? ((JSONArray) data.opt("WarnArea")).optJSONObject(0).optString("Shindo1", "") : "" : (data.optJSONObject("WarnArea") != null ? data.optJSONObject("WarnArea").optString("Shindo1", "") : ""),
+                    data.opt("WarnArea") instanceof JSONArray ? ((JSONArray) data.opt("WarnArea")).optJSONObject(0) != null ? ((JSONArray) data.opt("WarnArea")).optJSONObject(0).optString("Shindo2", "") : "" : (data.optJSONObject("WarnArea") != null ? data.optJSONObject("WarnArea").optString("Shindo2", "") : ""),
+                    data.opt("WarnArea") instanceof JSONArray ? ((JSONArray) data.opt("WarnArea")).optJSONObject(0) != null ? ((JSONArray) data.opt("WarnArea")).optJSONObject(0).optString("Time", "") : "" : (data.optJSONObject("WarnArea") != null ? data.optJSONObject("WarnArea").optString("Time", "") : ""),
+                    data.opt("WarnArea") instanceof JSONArray ? ((JSONArray) data.opt("WarnArea")).optJSONObject(0) != null ? ((JSONArray) data.opt("WarnArea")).optJSONObject(0).optString("Type", "") : "" : (data.optJSONObject("WarnArea") != null ? data.optJSONObject("WarnArea").optString("Type", "") : ""),
+                    data.optInt("Serial", 0),
+                    data.optDouble("Latitude", 0),
+                    data.optDouble("Longitude", 0),
+                    data.optDouble("Magnitude", 0),
+                    data.optDouble("Depth", 0),
+                    data.opt("WarnArea") instanceof JSONArray ? ((JSONArray) data.opt("WarnArea")).optJSONObject(0) != null && ((JSONArray) data.opt("WarnArea")).optJSONObject(0).optBoolean("Arrive", false) : (data.optJSONObject("WarnArea") != null && data.optJSONObject("WarnArea").optBoolean("Arrive", false)),
+                    data.optBoolean("isSea", false),
+                    data.optBoolean("isTraining", false),
+                    data.optBoolean("isAssumption", false),
+                    data.optBoolean("isWarn", false),
+                    data.optBoolean("isFinal", false),
+                    data.optBoolean("isCancel", false),
+                    data.optString("OriginalText", "")
             };
         } else {
             return new Object[]{
-                    data.optString("type", ""),      // 1
-                    data.optString("id", ""),        // 2
-                    data.optString("timestamp", ""), // 3
-                    data.optString("ver", "")        // 4
+                    data.optString("type", ""),
+                    data.optString("id", ""),
+                    data.optString("timestamp", ""),
+                    data.optString("ver", "")
             };
         }
     }
@@ -83,6 +85,7 @@ public class WolfxCon {
                     "ID: " + data.optString("id", "不明") + "\n" +
                     "メッセージ: " + data.optString("message", "（なし）") + "\n";
         }
+
         // jma_eew
         else if ("jma_eew".equals(type)) {
             StringBuilder msg = new StringBuilder();
@@ -119,7 +122,6 @@ public class WolfxCon {
                         .append(" (理由: ").append(maxIntChange.optString("Reason", "不明")).append(")\n");
             }
 
-            // WarnAreaの処理を改善
             if (data.has("WarnArea")) {
                 msg.append("\n【警報情報】\n");
                 Object warnObj = data.opt("WarnArea");
@@ -165,10 +167,21 @@ public class WolfxCon {
             if (data.has("OriginalText")) {
                 msg.append("\n【原文】\n").append(data.optString("OriginalText", "")).append("\n");
             }
+
             telopText = msg.toString();
 
+            // ★ 追加: TTSで読み上げ
+            if (ttscon != null && ttscon.isReady()) {
+                String readText = "緊急地震速報です。震源地は " +
+                        data.optString("Hypocenter", "不明") +
+                        "。最大震度は " + data.optString("MaxIntensity", "不明") +
+                        "。マグニチュード " + data.optDouble("Magnitude", 0) + " です。";
+                ttscon.speak(readText);
+            } else {
+                Log.w(TAG, "TTSが未準備のため、読み上げをスキップしました。");
+            }
+
         } else {
-            // 未対応タイプ
             telopText = "【未対応のデータ】\nタイプ: " + type + "\n内容:\n" + data.toString(2);
         }
         return telopText;

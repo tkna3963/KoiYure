@@ -72,7 +72,6 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 Log.d(TAG, "WebViewのページ読み込み完了: " + url);
-                NotiFunc.showNotification(MainActivity.this, "ページ読み込み完了", url, 1003);
                 sendMessageToWebView("onP2PStatusChange", String.valueOf(isP2PConnected));
                 sendMessageToWebView("onWolfxStatusChange", String.valueOf(isWolfxConnected));
             }

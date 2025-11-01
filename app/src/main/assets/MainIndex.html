@@ -2,27 +2,36 @@
 <html lang="ja">
 
 <head>
+    <!-- ===== メタ情報 ===== -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- ===== スクリプト ===== -->
     <script src="scripts.js"></script>
     <script src="P2P.js"></script>
     <script src="Wolfx.js"></script>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+    <!-- ===== スタイル ===== -->
     <link rel="stylesheet" href="Styles.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
     <title>古明地こいしアプリ</title>
     <link rel="icon" href="Img/epicenter.png">
 </head>
 
 <body>
+    <!-- ===== 時刻表示 & メイン表示 ===== -->
     <h1 id="now_time">2000/01/01 00:00:00</h1>
     <textarea id="maintextarea" rows="1" readonly></textarea>
     <input type="range" id="pagebar" min="0" max="0" value="0">
+
+    <!-- ===== キャラクター表示 ===== -->
     <div class="koisiarrow_box">古明地こいしだよ!!</div>
     <img src="Img/baclgroundimg.jpg" id="back">
     <img src="Img/hyoujyou_bishou_koisi.png" id="koisi">
 
-    <!-- メニュー -->
+    <!-- ===== メニュー ===== -->
     <div id="menu">
         <h2>メニュー</h2>
         <a id="linker" target="_blank" href="settings.html">設定 </a>
@@ -33,7 +42,6 @@
             <span id="p2pStatusIndicator" class="status-indicator status-disconnected"></span>
             <span id="p2pStatusText">切断</span>
         </div>
-
         <div>
             <h4>Wolfx　JMA API</h4>
             <span id="wolfxStatusIndicator" class="status-indicator status-disconnected"></span>
@@ -41,15 +49,16 @@
         </div>
     </div>
 
-    <!-- 情報メニュー -->
+    <!-- ===== 情報メニュー ===== -->
     <div id="infomenu">
         <h2>情報メニュー</h2>
     </div>
 
-    <!-- ボタン -->
+    <!-- ===== メニュー開閉ボタン ===== -->
     <button id="toggleMenuBtn">☰</button>
     <button id="toggleinfoMenuBtn">☰</button>
 
+    <!-- ===== スクリプト: メニュー操作・時刻表示・データ管理 ===== -->
     <script>
         // --- メニュー開閉 ---
         const menu = document.getElementById('menu');
@@ -81,45 +90,32 @@
         // --- データ管理 ---
         let AllWebsocketData = [];
         function MainTextarea(num) {
-            console.log("呼ばれた", num);
             const textarea = document.getElementById("maintextarea");
-            console.log("textarea", textarea);
             if (!textarea) return;
 
-            console.log("AllWebsocketData", AllWebsocketData);
             if (num >= 0 && num < AllWebsocketData.length) {
                 let value = AllWebsocketData[num];
 
-                // 文字列ならオブジェクトに変換
                 if (typeof value === "string") {
                     try {
                         value = JSON.parse(value);
                     } catch (e) {
-                        console.error("JSON変換失敗:", e, value);
                         textarea.value = "(無効なデータ)";
                         return;
                     }
                 }
 
-                console.log("value", value);
-
                 if (value.code) {
-                    const out = formatToTelop(value);
-                    console.log("formatToTelop ->", out);
-                    textarea.value = out;
+                    textarea.value = formatToTelop(value);
                 } else if (value.type) {
-                    const out = wolfxcoverter(value) ?? "(空のメッセージ)";
-                    console.log("wolfxcoverter ->", out);
-                    textarea.value = out;
+                    textarea.value = wolfxcoverter(value) ?? "(空のメッセージ)";
                 } else {
                     textarea.value = "(処理対象なし)";
-                    console.log("対象となる code/type がない");
                 }
             }
         }
 
-
-        // --- データ受信時 (MainActivityから呼ばれる) ---
+        // --- データ受信時 ---
         function onP2PMessage(msg) {
             AllWebsocketData.push(msg);
             updatePagebar();
@@ -132,6 +128,7 @@
             MainTextarea(AllWebsocketData.length - 1);
         }
 
+        // --- ページバー更新 ---
         function updatePagebar() {
             const pagebar = document.getElementById("pagebar");
             pagebar.max = AllWebsocketData.length > 0 ? AllWebsocketData.length - 1 : 0;
@@ -143,6 +140,7 @@
             MainTextarea(index);
         });
 
+        // --- 接続状況表示 ---
         function updateStatusDisplay(indicatorId, textId, isConnected) {
             const indicatorElement = document.getElementById(indicatorId);
             const textElement = document.getElementById(textId);
@@ -161,13 +159,11 @@
         }
 
         function onP2PStatusChange(isConnectedStr) {
-            const isConnected = (isConnectedStr === 'true');
-            updateStatusDisplay('p2pStatusIndicator', 'p2pStatusText', isConnected);
+            updateStatusDisplay('p2pStatusIndicator', 'p2pStatusText', isConnectedStr === 'true');
         }
 
         function onWolfxStatusChange(isConnectedStr) {
-            const isConnected = (isConnectedStr === 'true');
-            updateStatusDisplay('wolfxStatusIndicator', 'wolfxStatusText', isConnected);
+            updateStatusDisplay('wolfxStatusIndicator', 'wolfxStatusText', isConnectedStr === 'true');
         }
 
         window.onload = function () {
@@ -179,7 +175,6 @@
                 document.getElementById('wolfxStatusText').textContent = 'Android API利用不可';
             }
         };
-
     </script>
 </body>
 
