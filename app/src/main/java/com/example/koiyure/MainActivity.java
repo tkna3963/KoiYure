@@ -47,6 +47,7 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
 
     private boolean isP2PConnected = false;
     private boolean isWolfxConnected = false;
+    HttpServer httpServer;
     private Cache cache = Cache.getInstance();
     private com.example.koiyure.Settings settings;  // Settings用のフィールド
 
@@ -94,7 +95,9 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
                 sendMessageToWebView("onWolfxStatusChange", String.valueOf(isWolfxConnected));
             }
         });
-        webView.loadUrl("file:///android_asset/MainIndex.html");
+        httpServer = new HttpServer(this, 8080);
+        httpServer.startServer();
+        webView.loadUrl("http://localhost:8080");
         webView.addJavascriptInterface(new WebAppInterface(this), "Android");
 
         // ----------------------------------------
@@ -268,6 +271,9 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
             webView.destroy();
             webView = null;
             Log.d(TAG, "WebViewを破棄しました。");
+        }
+        if (httpServer != null) {
+            httpServer.stopServer();
         }
         mainHandler.removeCallbacksAndMessages(null);
     }

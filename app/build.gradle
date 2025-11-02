@@ -42,6 +42,7 @@ dependencies {
 
     // ネットワーク通信
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'org.nanohttpd:nanohttpd:2.3.1'
 
     // 位置情報
     implementation 'com.google.android.gms:play-services-location:21.0.1'

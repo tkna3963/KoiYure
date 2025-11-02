@@ -78,55 +78,79 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
 
+        // Android環境かどうかをチェック
+        function isAndroidEnvironment() {
+            return typeof window.Android !== 'undefined' && window.Android !== null;
+        }
+
+        // 設定値を取得（Android/ブラウザ両対応）
+        function getSetting(key, defaultValue) {
+            if (isAndroidEnvironment()) {
+                return window.Android.getSetting(key, defaultValue);
+            }
+        }
+
+        // 設定値を保存（Android/ブラウザ両対応）
+        function setSetting(key, value) {
+            if (isAndroidEnvironment()) {
+                window.Android.setSetting(key, value);
+            } else {
+                localStorage.setItem(key, value);
+            }
+        }
+
+        // 設定値の存在確認（Android/ブラウザ両対応）
+        function containsSetting(key) {
+            if (isAndroidEnvironment()) {
+                return window.Android.containsSetting(key);
+            }
+            return localStorage.getItem(key) !== null;
+        }
+
         const userSelect = document.getElementById("userSelect");
         const authBox = document.getElementById("authBox");
         let previousValue = userSelect.value;
 
-        const savedUserType = localStorage.getItem("userType");
-        const creatorUnlocked = localStorage.getItem("creatorUnlocked") === "true";
+        // 保存された設定を読み込み
+        const savedUserType = getSetting("user/type", "townsman");
+        const creatorUnlocked = getSetting("creator/unlocked", "false") === "true";
 
+        // 初期化
         if (savedUserType) {
             if (savedUserType === "creator" && creatorUnlocked) {
                 userSelect.value = "creator";
                 previousValue = "creator";
                 authBox.style.display = "none";
-                if (window.Android && window.Android.setSetting) {
-                    window.Android.setSetting("user/type", "creator");
+            } else {
+                userSelect.value = savedUserType;
+                previousValue = savedUserType;
+                if (savedUserType === "creator") {
+                    authBox.style.display = "block";
+                } else {
+                    authBox.style.display = "none";
                 }
-            } else {
-                setUserTypeFromJava(savedUserType);
             }
         }
 
-        function setUserTypeFromJava(userType) {
-            if (!userType) userType = "townsman";
-            userSelect.value = userType;
-            previousValue = userType;
-
-            if (userType === "creator") {
-                authBox.style.display = "block";
-            } else {
-                authBox.style.display = "none";
-            }
-        }
-
+        // ユーザータイプ変更時の処理
         userSelect.addEventListener("change", () => {
             const selected = userSelect.value;
             if (selected === "creator") {
                 if (creatorUnlocked) {
                     authBox.style.display = "none";
                     previousValue = "creator";
-                    localStorage.setItem("userType", "creator");
+                    setSetting("user/type", "creator");
                 } else {
                     authBox.style.display = "block";
                 }
             } else {
                 authBox.style.display = "none";
                 previousValue = selected;
-                localStorage.setItem("userType", selected);
+                setSetting("user/type", selected);
             }
         });
 
+        // 認証ボタンのクリック処理
         document.getElementById("auth-btn").addEventListener("click", async () => {
             const email = document.getElementById("login-email").value;
             const password = document.getElementById("login-password").value;
@@ -138,8 +162,8 @@
                 userSelect.value = "creator";
                 previousValue = "creator";
 
-                localStorage.setItem("userType", "creator");
-                localStorage.setItem("creatorUnlocked", "true");
+                setSetting("user/type", "creator");
+                setSetting("creator/unlocked", "true");
                 authBox.style.display = "none";
             } catch (error) {
                 console.error(error);
