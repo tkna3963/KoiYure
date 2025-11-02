@@ -148,7 +148,6 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
             cache.add("P2P",message);
             String telopText = p2pConverter.convertToTelop(new JSONObject(message));
             NotiFunc.showNotification(this, "KoiYue", telopText, 1);
-            updateWidget(message);
         } catch (Exception e) {
             Log.e(TAG, "P2P JSON変換に失敗しました: " + e.getMessage());
         }
@@ -166,7 +165,6 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
             cache.add("Wolfx",message);
             String telopText = wolfxConverter.wolfxConverter(new JSONObject(message));
             NotiFunc.showNotification(this, "KoiYue", telopText, 1);
-            updateWidget(message);
         } catch (Exception e) {
             Log.e(TAG, "Wolfx JSON変換に失敗しました: " + e.getMessage());
         }
@@ -175,17 +173,6 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
     @Override
     public void onWolfxStatusChanged(boolean isConnected) {
         Log.d(TAG, "Wolfx接続状態: " + (isConnected ? "接続中" : "切断中"));
-    }
-
-    private void updateWidget(String data) {
-        WidgetProvider.setLastReceivedData(data);
-        AppWidgetManager manager = AppWidgetManager.getInstance(this);
-        ComponentName widget = new ComponentName(this, WidgetProvider.class);
-        int[] ids = manager.getAppWidgetIds(widget);
-        if (ids.length > 0) {
-            WidgetProvider.updateWidget(this, manager, ids);
-            Log.d(TAG, "ウィジェットを更新しました。");
-        }
     }
 
     @Override

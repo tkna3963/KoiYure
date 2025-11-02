@@ -48,11 +48,16 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
     private boolean isP2PConnected = false;
     private boolean isWolfxConnected = false;
     private Cache cache = Cache.getInstance();
+    private com.example.koiyure.Settings settings;  // Settings用のフィールド
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
+
+        // Settingsインスタンスの作成（コンテキストを渡す）
+        settings = new com.example.koiyure.Settings(this);
+
         setContentView(R.layout.activity_main);
 
         webView = findViewById(R.id.webView);
@@ -293,6 +298,34 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
         public boolean isWolfxWebSocketConnected() {
             Log.d(TAG, "WebViewからisWolfxWebSocketConnected()が呼ばれました。接続状態: " + mActivity.isWolfxConnected);
             return mActivity.isWolfxConnected;
+        }
+
+        // 設定値を取得
+        @android.webkit.JavascriptInterface
+        public String getSetting(String key, String defaultValue) {
+            Log.d(TAG, "WebViewからgetSetting()が呼ばれました。key: " + key);
+            return mActivity.settings.get(key, defaultValue);
+        }
+
+        // 設定値を保存
+        @android.webkit.JavascriptInterface
+        public void setSetting(String key, String value) {
+            Log.d(TAG, "WebViewからsetSetting()が呼ばれました。key: " + key + ", value: " + value);
+            mActivity.settings.set(key, value);
+        }
+
+        // キーが存在するか確認
+        @android.webkit.JavascriptInterface
+        public boolean containsSetting(String key) {
+            Log.d(TAG, "WebViewからcontainsSetting()が呼ばれました。key: " + key);
+            return mActivity.settings.contains(key);
+        }
+
+        // 設定値を削除
+        @android.webkit.JavascriptInterface
+        public void removeSetting(String key) {
+            Log.d(TAG, "WebViewからremoveSetting()が呼ばれました。key: " + key);
+            mActivity.settings.remove(key);
         }
     }
 }

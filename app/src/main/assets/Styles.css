@@ -57,7 +57,7 @@ body, html {
         #3fd304 25%, #3fd304 75%, 
         #dc5fd7 75%, #dc5fd7 100%);
     cursor: pointer;
-    z-index: 9999;
+    z-index: 15;
 
     -webkit-appearance: none;
     -moz-appearance: none;
