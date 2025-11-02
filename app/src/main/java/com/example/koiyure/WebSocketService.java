@@ -10,6 +10,7 @@ import android.appwidget.AppWidgetManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
@@ -22,6 +23,7 @@ import android.os.Looper;
 import android.os.PowerManager;
 import android.os.SystemClock;
 import android.util.Log;
+import android.widget.RemoteViews;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
@@ -35,6 +37,8 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
     private static final String CHANNEL_ID = "WebSocketServiceChannel";
     private static final String TAG = "WebSocketService";
     private static final int SERVICE_NOTIFICATION_ID = 1;
+    private static final String PREFS_NAME = "WidgetPrefs";
+    private static final String SERVICE_STATE_KEY = "service_running";
 
     private P2PWebsocket p2pWebsocket;
     private WolfxWebsocket wolfxWebsocket;
@@ -42,12 +46,11 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
     private ConnectivityManager connectivityManager;
     private PowerManager.WakeLock wakeLock;
 
-    private P2Pcon p2pConverter; // P2Pconのインスタンスを追加
-    private WolfxCon wolfxConverter; // WolfxConのインスタンスを追加 (WolfxConもContextを必要とする想定)
+    private P2Pcon p2pConverter;
+    private WolfxCon wolfxConverter;
     private Cache cache = Cache.getInstance();
 
-
-    private static final long HEALTH_CHECK_INTERVAL_MS = 33 * 1000; // 33秒ごと (30秒から少しずらして安定性向上)
+    private static final long HEALTH_CHECK_INTERVAL_MS = 33 * 1000;
     private Handler healthCheckHandler = new Handler(Looper.getMainLooper());
     private Runnable healthCheckRunnable = new Runnable() {
         @Override
@@ -79,6 +82,10 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
     public void onCreate() {
         super.onCreate();
         Log.d(TAG, "WebSocketService onCreate");
+
+        // サービス起動状態を保存
+        setServiceState(true);
+        updateAllWidgets();
 
         createNotificationChannel();
         startForeground(SERVICE_NOTIFICATION_ID, createNotification());
@@ -178,6 +185,8 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d(TAG, "WebSocketService onStartCommand");
+        setServiceState(true);
+        updateAllWidgets();
         return START_REDELIVER_INTENT;
     }
 
@@ -220,13 +229,17 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
     @Override
     public void onDestroy() {
         Log.d(TAG, "WebSocketService onDestroy");
+
+        // サービス停止状態を保存
+        setServiceState(false);
+        updateAllWidgets();
+
         if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
         healthCheckHandler.removeCallbacks(healthCheckRunnable);
         if (connectivityManager != null && networkCallback != null)
             connectivityManager.unregisterNetworkCallback(networkCallback);
         if (p2pWebsocket != null) p2pWebsocket.stop();
         if (wolfxWebsocket != null) wolfxWebsocket.stop();
-        // TTSリソースを解放する
 
         stopForeground(true);
         super.onDestroy();
@@ -270,5 +283,21 @@ public class WebSocketService extends Service implements P2PWebsocket.Listener, 
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setOngoing(true)
                 .build();
+    }
+
+    // サービス状態を保存
+    private void setServiceState(boolean isRunning) {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        prefs.edit().putBoolean(SERVICE_STATE_KEY, isRunning).apply();
+    }
+
+    // すべてのウィジェットを更新
+    private void updateAllWidgets() {
+        Intent intent = new Intent(this, WidgetsCon.class);
+        intent.setAction(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
+        AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(this);
+        int[] ids = appWidgetManager.getAppWidgetIds(new ComponentName(this, WidgetsCon.class));
+        intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids);
+        sendBroadcast(intent);
     }
 }

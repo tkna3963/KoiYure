@@ -3,26 +3,17 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="16dp"
-    android:gravity="center_horizontal">
+    android:gravity="center"
+    android:background="#FFFFFF">  <!-- ここで白背景 -->
 
-    <TextView
-        android:id="@+id/widget_time"
-        android:layout_width="wrap_content"
+    <Button
+        android:id="@+id/ssbutton"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="現在時刻"
-        android:textSize="20sp"
-        android:textColor="#ffffff"
-        android:fontFamily="sans-serif-medium"
-        android:layout_marginBottom="8dp" />
+        android:text="アプリ起動中" />
 
-    <TextView
-        android:id="@+id/widget_last_data"
-        android:layout_width="wrap_content"
+    <ImageView
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="最後の受信データ"
-        android:textSize="16sp"
-        android:textColor="#eeeeee"
-        android:fontFamily="sans-serif"
-        android:gravity="center" />
+        android:src="@drawable/koisiaiicon" />
 </LinearLayout>
