@@ -104,7 +104,7 @@ public class WolfxCon {
             msg.append("震源地: ").append(data.optString("Hypocenter", "不明"))
                     .append(" (緯度: ").append(data.optDouble("Latitude", 0))
                     .append(", 経度: ").append(data.optDouble("Longitude", 0)).append(")\n");
-            msg.append("マグニチュード: M").append(data.optDouble("Magnitude", 0))
+            msg.append("マグニチュード: M").append(data.optDouble("Magunitude", 0))
                     .append(" 深さ: ").append(data.optDouble("Depth", 0)).append("km\n");
             msg.append("最大震度: ").append(data.optString("MaxIntensity", "不明")).append("\n");
 
@@ -175,7 +175,7 @@ public class WolfxCon {
                 String readText = "緊急地震速報です。震源地は " +
                         data.optString("Hypocenter", "不明") +
                         "。最大震度は " + data.optString("MaxIntensity", "不明") +
-                        "。マグニチュード " + data.optDouble("Magnitude", 0) + " です。";
+                        "。マグニチュード " + data.optDouble("Magunitude", 0) + " です。";
                 ttscon.speak(readText);
             } else {
                 Log.w(TAG, "TTSが未準備のため、読み上げをスキップしました。");

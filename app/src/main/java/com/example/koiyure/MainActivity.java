@@ -1,7 +1,9 @@
 package com.example.koiyure;
 
+import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Build;
@@ -12,24 +14,24 @@ import android.os.PowerManager;
 import android.provider.Settings;
 import android.util.Log;
 import android.webkit.CookieManager;
+import android.webkit.WebChromeClient;
+import android.webkit.GeolocationPermissions;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkManager;
 
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
@@ -38,6 +40,8 @@ import java.util.concurrent.TimeUnit;
 public class MainActivity extends AppCompatActivity implements P2PWebsocket.Listener, WolfxWebsocket.Listener {
 
     private static final String TAG = "MainActivity";
+    private static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
+
     private WebView webView;
     private P2PWebsocket p2pWebsocket;
     private WolfxWebsocket wolfxWebsocket;
@@ -47,25 +51,26 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
 
     private boolean isP2PConnected = false;
     private boolean isWolfxConnected = false;
+
     HttpServer httpServer;
     private Cache cache = Cache.getInstance();
-    private com.example.koiyure.Settings settings;  // Settings用のフィールド
+    private com.example.koiyure.Settings settings;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
-
-        // Settingsインスタンスの作成（コンテキストを渡す）
         settings = new com.example.koiyure.Settings(this);
-
         setContentView(R.layout.activity_main);
 
+        // -------- WebView設定 --------
         webView = findViewById(R.id.webView);
         WebSettings webSettings = webView.getSettings();
         webSettings.setJavaScriptEnabled(true);
         webSettings.setDomStorageEnabled(true);
         webSettings.setDatabaseEnabled(true);
+        webSettings.setGeolocationEnabled(true); // ← 位置情報APIを有効化
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
         } else {
@@ -75,6 +80,15 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
             WebView.setWebContentsDebuggingEnabled(true);
         }
 
+        // -------- 位置情報の許可を自動承認するWebChromeClient --------
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
+                callback.invoke(origin, true, false);
+            }
+        });
+
+        // -------- ページ読み込み完了時 --------
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
@@ -83,7 +97,7 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
 
                 List<String> P2PCache = cache.getMessages("P2P");
                 List<String> WolfxCache = cache.getMessages("Wolfx");
-                //バックグラウンドで受信したものをWebViewに送信
+
                 for (String message : P2PCache) {
                     sendMessageToWebView("onP2PMessage", message);
                 }
@@ -95,83 +109,103 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
                 sendMessageToWebView("onWolfxStatusChange", String.valueOf(isWolfxConnected));
             }
         });
+
+        // -------- WebView起動 --------
         httpServer = new HttpServer(this, 8080);
         httpServer.startServer();
         webView.loadUrl("http://localhost:8080");
         webView.addJavascriptInterface(new WebAppInterface(this), "Android");
 
-        // ----------------------------------------
-        // P2P WebSocket
-        // ----------------------------------------
+        // -------- P2P / Wolfx WebSocket --------
         p2pWebsocket = new P2PWebsocket();
         p2pWebsocket.setListener(this);
         p2pWebsocket.start();
-        Log.d(TAG, "P2P WebSocketを起動しました。");
 
-        // Wolfx WebSocket
         wolfxWebsocket = new WolfxWebsocket();
         wolfxWebsocket.setListener(this);
         wolfxWebsocket.start();
-        Log.d(TAG, "Wolfx WebSocketを起動しました。");
 
         Intent serviceIntent = new Intent(this, WebSocketService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent);
-            Log.d(TAG, "WebSocketServiceをフォアグラウンドサービスとして起動しました。");
         } else {
             startService(serviceIntent);
-            Log.d(TAG, "WebSocketServiceをバックグラウンドサービスとして起動しました。");
         }
 
         requestIgnoreBatteryOptimizations();
         scheduleWebSocketRestartWorker();
+        requestLocationPermission(); // ← 実行時位置情報許可
     }
 
     // ------------------------------
-    // Listener関連の実装
+    // 実行時パーミッション確認
+    // ------------------------------
+    private void requestLocationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(
+                        this,
+                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                        LOCATION_PERMISSION_REQUEST_CODE
+                );
+            }
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+                                           @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(this, "位置情報が許可されました", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "位置情報が拒否されました", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    // ------------------------------
+    // Listener実装
     // ------------------------------
     @Override
     public void onP2PMessageReceived(String message) {
-        Log.d(TAG, "P2Pメッセージを受信しました: " + message);
         sendMessageToWebView("onP2PMessage", message);
     }
 
     @Override
     public void onP2PStatusChanged(boolean isConnected) {
-        Log.d(TAG, "P2P接続状態が変更されました: " + (isConnected ? "接続中" : "未接続"));
         this.isP2PConnected = isConnected;
         sendMessageToWebView("onP2PStatusChange", String.valueOf(isConnected));
     }
 
     @Override
     public void onWolfxMessageReceived(String message) {
-        Log.d(TAG, "Wolfxメッセージを受信しました: " + message);
         sendMessageToWebView("onWolfxMessage", message);
     }
 
     @Override
     public void onWolfxStatusChanged(boolean isConnected) {
-        Log.d(TAG, "Wolfx接続状態が変更されました: " + (isConnected ? "接続中" : "未接続"));
         this.isWolfxConnected = isConnected;
         sendMessageToWebView("onWolfxStatusChange", String.valueOf(isConnected));
     }
 
     // ------------------------------
-    // WebView用
+    // WebView通信処理
     // ------------------------------
     private void sendMessageToWebView(String jsFunction, String message) {
         if (message == null) message = "";
         try {
             String escapedMessage = JSONObject.quote(message);
             final String jsCode = "javascript:" + jsFunction + "(" + escapedMessage + ");";
-            Log.d(TAG, "WebViewに送信するJSをキューに追加: " + jsCode);
-
             synchronized (jsQueue) {
                 jsQueue.add(jsCode);
             }
             processQueue();
         } catch (Exception e) {
-            Log.e(TAG, "WebViewに送信するJSのキュー追加に失敗しました。", e);
+            Log.e(TAG, "WebView送信失敗", e);
         }
     }
 
@@ -193,7 +227,6 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
                         processQueue();
                     });
                 } else {
-                    Log.w(TAG, "WebViewがnullのためJSを実行できません: " + finalJs);
                     isSending = false;
                     processQueue();
                 }
@@ -204,37 +237,32 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
     }
 
     // ------------------------------
-    // バッテリー最適化対応
+    // バッテリー最適化無効化
     // ------------------------------
     private void requestIgnoreBatteryOptimizations() {
         PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
         if (pm != null && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
             new AlertDialog.Builder(this)
                     .setTitle("バックグラウンド実行の許可")
-                    .setMessage("このアプリをバックグラウンドで安定して動作させるため、バッテリー最適化を無効にしてください。\n「はい」を選択後、設定画面で本アプリの項目を「最適化しない」に設定してください。")
+                    .setMessage("このアプリを安定して動作させるため、バッテリー最適化を無効にしてください。")
                     .setPositiveButton("はい", (dialog, which) -> {
                         Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
                         intent.setData(Uri.parse("package:" + getPackageName()));
                         try {
                             startActivity(intent);
-                            Log.d(TAG, "バッテリー最適化無効化画面を開きました。");
                         } catch (Exception e) {
-                            Log.e(TAG, "バッテリー最適化設定画面を開けませんでした。", e);
-                            Toast.makeText(MainActivity.this, "手動で設定してください。", Toast.LENGTH_LONG).show();
+                            Toast.makeText(MainActivity.this, "設定画面を開けませんでした。", Toast.LENGTH_LONG).show();
                         }
                     })
-                    .setNegativeButton("いいえ", (dialog, which) -> {
-                        Toast.makeText(MainActivity.this, "バッテリー最適化が有効だとアプリが停止する可能性があります。", Toast.LENGTH_LONG).show();
-                    })
+                    .setNegativeButton("いいえ", null)
                     .show();
         }
     }
 
     // ------------------------------
-    // WorkManager再起動用
+    // WorkManager再起動設定
     // ------------------------------
     private void scheduleWebSocketRestartWorker() {
-        Log.d(TAG, "WebSocket再起動用WorkManagerをスケジュール中...");
         PeriodicWorkRequest workRequest = new PeriodicWorkRequest.Builder(
                 WebSocketRestartWorker.class,
                 15,
@@ -249,28 +277,22 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
                 ExistingPeriodicWorkPolicy.UPDATE,
                 workRequest
         );
-        Log.d(TAG, "WebSocket再起動用WorkManagerを正常にスケジュールしました。");
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        Log.d(TAG, "MainActivityを破棄します。");
-
         if (p2pWebsocket != null) {
             p2pWebsocket.stop();
             p2pWebsocket = null;
-            Log.d(TAG, "P2P WebSocketを停止しました。");
         }
         if (wolfxWebsocket != null) {
             wolfxWebsocket.stop();
             wolfxWebsocket = null;
-            Log.d(TAG, "Wolfx WebSocketを停止しました。");
         }
         if (webView != null) {
             webView.destroy();
             webView = null;
-            Log.d(TAG, "WebViewを破棄しました。");
         }
         if (httpServer != null) {
             httpServer.stopServer();
@@ -279,7 +301,7 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
     }
 
     // ------------------------------
-    // WebView用インターフェース
+    // WebViewインターフェース
     // ------------------------------
     public class WebAppInterface {
         MainActivity mActivity;
@@ -289,48 +311,38 @@ public class MainActivity extends AppCompatActivity implements P2PWebsocket.List
         }
 
         @android.webkit.JavascriptInterface
-        public String CacheReturn(){
+        public String CacheReturn() {
             List<String> types = cache.getAllMessages();
             return types.toString();
         }
 
         @android.webkit.JavascriptInterface
         public boolean isP2PWebSocketConnected() {
-            Log.d(TAG, "WebViewからisP2PWebSocketConnected()が呼ばれました。接続状態: " + mActivity.isP2PConnected);
             return mActivity.isP2PConnected;
         }
 
         @android.webkit.JavascriptInterface
         public boolean isWolfxWebSocketConnected() {
-            Log.d(TAG, "WebViewからisWolfxWebSocketConnected()が呼ばれました。接続状態: " + mActivity.isWolfxConnected);
             return mActivity.isWolfxConnected;
         }
 
-        // 設定値を取得
         @android.webkit.JavascriptInterface
         public String getSetting(String key, String defaultValue) {
-            Log.d(TAG, "WebViewからgetSetting()が呼ばれました。key: " + key);
             return mActivity.settings.get(key, defaultValue);
         }
 
-        // 設定値を保存
         @android.webkit.JavascriptInterface
         public void setSetting(String key, String value) {
-            Log.d(TAG, "WebViewからsetSetting()が呼ばれました。key: " + key + ", value: " + value);
             mActivity.settings.set(key, value);
         }
 
-        // キーが存在するか確認
         @android.webkit.JavascriptInterface
         public boolean containsSetting(String key) {
-            Log.d(TAG, "WebViewからcontainsSetting()が呼ばれました。key: " + key);
             return mActivity.settings.contains(key);
         }
 
-        // 設定値を削除
         @android.webkit.JavascriptInterface
         public void removeSetting(String key) {
-            Log.d(TAG, "WebViewからremoveSetting()が呼ばれました。key: " + key);
             mActivity.settings.remove(key);
         }
     }

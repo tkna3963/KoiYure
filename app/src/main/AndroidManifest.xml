@@ -48,6 +48,17 @@
             android:enabled="true"
             android:foregroundServiceType="dataSync"
             android:exported="false" /> <!-- サービスは外部アプリから直接呼び出さないためexportedをfalseに -->
+        <service
+            android:name=".ServiceTile"
+            android:exported="true"
+            android:label="KoiYure"
+            android:icon="@drawable/koisifavicon"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
@@ -67,5 +78,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info"/>
         </receiver>
+
     </application>
 </manifest>
