@@ -3,10 +3,15 @@ package com.example.koiyure;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.graphics.drawable.Icon;
 import android.os.Build;
 import android.service.quicksettings.Tile;
 import android.service.quicksettings.TileService;
+
+import androidx.work.ExistingPeriodicWorkPolicy;
+import androidx.work.PeriodicWorkRequest;
+import androidx.work.WorkManager;
+
+import java.util.concurrent.TimeUnit;
 
 public class ServiceTile extends TileService {
 
@@ -28,17 +33,38 @@ public class ServiceTile extends TileService {
 
     private void toggleService() {
         boolean isRunning = getServiceState(this);
-        Intent serviceIntent = new Intent(this, WebSocketService.class);
+        Intent WebSocketServiceserviceIntent = new Intent(this, WebSocketService.class);
 
         if (isRunning) {
-            stopService(serviceIntent);
+            // ---- サービスを完全停止 ----
+            stopService(WebSocketServiceserviceIntent);
+            WorkManager.getInstance(this).cancelAllWorkByTag("WebSocketRestartWorkerTag");
+            WorkManager.getInstance(this).cancelUniqueWork("WebSocketServiceRestart");
             setServiceState(this, false);
         } else {
+            // ---- サービスを起動 ----
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(serviceIntent);
+                startForegroundService(WebSocketServiceserviceIntent);
             } else {
-                startService(serviceIntent);
+                startService(WebSocketServiceserviceIntent);
             }
+
+            // ---- 再起動Workerを登録 ----
+            PeriodicWorkRequest workRequest = new PeriodicWorkRequest.Builder(
+                    WebSocketRestartWorker.class,
+                    15,
+                    TimeUnit.MINUTES
+            )
+                    .setInitialDelay(30, TimeUnit.SECONDS)
+                    .addTag("WebSocketRestartWorkerTag")
+                    .build();
+
+            WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+                    "WebSocketServiceRestart",
+                    ExistingPeriodicWorkPolicy.UPDATE,
+                    workRequest
+            );
+
             setServiceState(this, true);
         }
     }
@@ -49,7 +75,6 @@ public class ServiceTile extends TileService {
 
         boolean isRunning = getServiceState(this);
 
-        // 状態に応じて見た目を切り替える
         if (isRunning) {
             tile.setState(Tile.STATE_ACTIVE);
             tile.setLabel("アプリ起動中");

@@ -10,6 +10,12 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import android.widget.RemoteViews;
 
+import androidx.work.ExistingPeriodicWorkPolicy;
+import androidx.work.PeriodicWorkRequest;
+import androidx.work.WorkManager;
+
+import java.util.concurrent.TimeUnit;
+
 public class WidgetsCon extends AppWidgetProvider {
 
     private static final String PREFS_NAME = "WidgetPrefs";
@@ -69,23 +75,42 @@ public class WidgetsCon extends AppWidgetProvider {
 
     private void toggleService(Context context) {
         boolean isRunning = getServiceState(context);
-
-        Intent serviceIntent = new Intent(context, WebSocketService.class);
-
         if (isRunning) {
-            // サービスを停止
-            context.stopService(serviceIntent);
+            // サービス停止
+            context.stopService(new Intent(context, WebSocketService.class));
+            // Workerを止める
+            WorkManager.getInstance(context).cancelAllWorkByTag("WebSocketRestartWorkerTag");
+            WorkManager.getInstance(context).cancelUniqueWork("WebSocketServiceRestart");
             setServiceState(context, false);
         } else {
-            // サービスを開始
+            // サービス起動
+            Intent serviceIntent = new Intent(context, WebSocketService.class);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(serviceIntent);
             } else {
                 context.startService(serviceIntent);
             }
+
+            // Workerを再登録
+            PeriodicWorkRequest workRequest = new PeriodicWorkRequest.Builder(
+                    WebSocketRestartWorker.class,
+                    15,
+                    TimeUnit.MINUTES
+            )
+                    .setInitialDelay(30, TimeUnit.SECONDS)
+                    .addTag("WebSocketRestartWorkerTag")
+                    .build();
+
+            WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+                    "WebSocketServiceRestart",
+                    ExistingPeriodicWorkPolicy.UPDATE,
+                    workRequest
+            );
+
             setServiceState(context, true);
         }
     }
+
 
     private boolean getServiceState(Context context) {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);

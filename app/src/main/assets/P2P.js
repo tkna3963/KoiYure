@@ -18,6 +18,39 @@ function formatToTelop(json) {
     }
 }
 
+function JSONLoad(filePath) {
+    return fetch(filePath)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        }
+        )
+        .catch(error => {
+            console.error("JSONの読み込みエラー:", error);
+            return null;
+        });
+}
+
+function CSVLoad(filePath) {
+    return fetch(filePath)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.text();
+        })
+        .then(text => {
+            const rows = text.trim().split("\n");
+            const data = rows.map(row => row.split(","));
+            return data;
+        })
+        .catch(error => {
+            console.error("CSVの読み込みエラー:", error);
+            return null;
+        });
+}
 
 // codeに対応する列の値を取得する関数
 function getValueByCode(data, code, columnName) {
