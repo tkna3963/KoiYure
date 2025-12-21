@@ -1,18 +1,18 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.google.gms.google.services)
-    alias(libs.plugins.google.firebase.crashlytics)
 }
 
 android {
     namespace 'com.example.koiyure'
-    compileSdk 36   // ← 修正
+    compileSdk 36
+
     defaultConfig {
         applicationId "com.example.koiyure"
         minSdk 29
-        targetSdk 36 // ← 修正
+        targetSdk 36
         versionCode 1
         versionName "1.0"
+
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -29,31 +29,19 @@ android {
 }
 
 dependencies {
+
     implementation libs.appcompat
     implementation libs.material
     implementation libs.activity
     implementation libs.constraintlayout
-    implementation libs.firebase.messaging
-    implementation libs.firebase.database
-    implementation libs.firebase.ai
-    implementation libs.play.services.maps
     testImplementation libs.junit
     androidTestImplementation libs.ext.junit
     androidTestImplementation libs.espresso.core
-
-    // ネットワーク通信
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
-    implementation 'org.nanohttpd:nanohttpd:2.3.1'
-
-    // 位置情報
     implementation 'com.google.android.gms:play-services-location:21.0.1'
-
-    // ワーカー（最新に統一）
-    implementation "androidx.work:work-runtime:2.9.0"
-
-    // Firebase（BOMでバージョン統一）
+    implementation "androidx.work:work-runtime:2.8.1"
     implementation platform('com.google.firebase:firebase-bom:33.16.0')
+    implementation 'com.google.firebase:firebase-crashlytics-ndk'
     implementation 'com.google.firebase:firebase-analytics'
     implementation 'com.google.firebase:firebase-crashlytics'
-    implementation 'com.google.firebase:firebase-crashlytics-ndk'
 }
