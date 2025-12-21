@@ -1,3 +1,16 @@
+function loadJSON(filePath) {
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', filePath, false);
+    xhr.send();
+    if (xhr.status === 200) {
+        return JSON.parse(xhr.responseText);
+    } else {
+        console.error('Error loading JSON:', xhr.status, xhr.statusText);
+        return null;
+    }
+}
+
+
 function formatToTelop(json) {
     if (json.code == 551) {
         return formatJMAQuakeToTelop(json);
@@ -18,38 +31,19 @@ function formatToTelop(json) {
     }
 }
 
-function JSONLoad(filePath) {
-    return fetch(filePath)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        }
-        )
-        .catch(error => {
-            console.error("JSONの読み込みエラー:", error);
-            return null;
-        });
-}
 
-function CSVLoad(filePath) {
-    return fetch(filePath)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.text();
-        })
-        .then(text => {
-            const rows = text.trim().split("\n");
-            const data = rows.map(row => row.split(","));
-            return data;
-        })
-        .catch(error => {
-            console.error("CSVの読み込みエラー:", error);
-            return null;
-        });
+function readCSV(path) {
+    const request = new XMLHttpRequest();
+    request.open('GET', path, false); // 同期
+    request.overrideMimeType('text/plain; charset=UTF-8');
+    request.send(null);
+
+    if (request.status === 200) {
+        return request.responseText;
+    } else {
+        console.error(`ファイルの読み込みに失敗しました。ステータスコード: ${request.status}`);
+        return null;
+    }
 }
 
 // codeに対応する列の値を取得する関数
@@ -73,6 +67,22 @@ function getValueByCode(data, code, columnName) {
         }
     }
     return "該当なし";
+}
+
+
+const Locate551 = loadJSON('Item/PointSeismicIntensityLocation.json');
+// 町名から緯度経度を返す関数
+function getLocationByTown(townName) {
+    if (!Locate551) {
+        console.error('JSONデータが読み込めません');
+        return null;
+    }
+    for (const key in Locate551) {
+        if (Locate551[key].name === townName) {
+            return Locate551[key].location; // [緯度, 経度]を返す
+        }
+    }
+    return null; // 見つからなければ null
 }
 
 function getShindoColorByName(shindoName) {
@@ -187,6 +197,16 @@ function formatJMAQuakeToTelop(jmaQuake) {
 
     // --- テロップ文章組み立て ---
 
+    const Location551List = [];
+    points.forEach(p => {
+        const loc = getLocationByTown(p.addr)
+        if (loc) {
+            const latitude = loc[0];
+            const longitude = loc[1];
+            Location551List.push([longitude, latitude, scaleMap[p.scale]])
+        };
+    });
+
     const telop =
         `ID: ${_id}受信日時: ${receivedTime}
 
@@ -218,6 +238,7 @@ ${freeComment}` : ''}`;
     return telop;
 }
 
+const TunamiCSV = readCSV("Item/TunamiRegion.csv")
 function formatJMATsunamisToTelop(jmaTsunamis) {
     const { _id, code, time: receivedTime, cancelled, issue, areas } = jmaTsunamis;
 
@@ -279,6 +300,7 @@ ID: ${_id}
         const maxHeightDesc = area.maxHeight?.description || "不明";
         const maxHeightValue = (typeof area.maxHeight?.value === "number") ? area.maxHeight.value : null;
 
+        TSUNAMIAREALIST.push([getValueByCode(TunamiCSV, area.name, "コード"), name, maxHeightDesc]);
 
 
         const heightText = maxHeightValue !== null
@@ -349,11 +371,14 @@ ID: ${_id}
 
 津波予報区の情報はありません。`;
     }
+    const TSUNAMIAREALIST = [];
     // --- 各地域の文章化 ---
     const areasText = areas.map(area => {
         const gradeText = gradeMap[area.grade] || area.grade || "不明";
         const immedText = area.immediate ? "直ちに津波が来襲すると予想されています。" : "直ちに津波が来襲する予想はありません。";
         const name = area.name || "不明";
+
+        TSUNAMIAREALIST.push([getValueByCode(TunamiCSV, area.name, "コード"), name, immedText]);
 
 
         return `・${name}：${gradeText}
@@ -378,7 +403,10 @@ ${areasText}`;
 
 function formatUserquakeToTelop(userquake) {
     const { _id, code, time: receivedTime, area } = userquake;
+    const AreaData = readCSV("Item/epsp-area.csv");
 
+    const lng = Number(getValueByCode(AreaData, area, "経度"));
+    const lat = Number(getValueByCode(AreaData, area, "緯度"));
 
     if (isFinite(lng) && isFinite(lat)) {
         // lng, lat の順番で渡す
@@ -389,7 +417,7 @@ function formatUserquakeToTelop(userquake) {
         `ID: ${_id}\n` +
         `情報コード: ${code}\n` +
         `受信日時: ${receivedTime}\n` +
-        `地域: ${area}`
+        `地域: ${getValueByCode(AreaData, area, "地域")}`
     );
 }
 
@@ -408,8 +436,17 @@ ID: ${_id}
         );
     }
 
+    const AreaData = readCSV("Item/epsp-area.csv");
+    const areasText = areas.map(area => `${getValueByCode(AreaData, area.id, "地域")}: ピア数 ${area.peer}\n`);
+    const AreapeersList = [];
+    areas.forEach(area => {
+        const lat = Number(getValueByCode(AreaData, area.id, "経度"));
+        const lng = Number(getValueByCode(AreaData, area.id, "緯度"));
+        if (isFinite(lat) && isFinite(lng)) {
+            AreapeersList.push([lat, lng, area.peer])
+        }
+    });
 
-    const areasText = areas.map(area => `${area.id}: ピア数 ${area.peer}\n`);
     // ここでまとめて呼び出す
 
     const telop =
@@ -576,11 +613,23 @@ function formatUserquakeEvaluationToTelop(evaluation) {
         return "A";
     }
 
+    const AreaData = readCSV("Item/epsp-area.csv");
+    const P2PEvaluation = [];
+
+    if (area_confidences && Object.keys(area_confidences).length > 0) {
+        Object.entries(area_confidences).forEach(([areaCode, data]) => {
+            const la = getValueByCode(AreaData, areaCode, "緯度");
+            const lo = getValueByCode(AreaData, areaCode, "経度");
+            const grade = getAreaGrade(data.confidence);
+            P2PEvaluation.push([lo, la, grade]);
+        });
+    }
+
     // 地域ごとの情報整形
     const areasText = (area_confidences && Object.keys(area_confidences).length > 0)
         ? Object.entries(area_confidences).map(([areaCode, data]) => {
             const grade = getAreaGrade(data.confidence);
-            return `${areaCode}：
+            return `${getValueByCode(AreaData, areaCode, "地域") || areaCode}：
   信頼度: ${data.confidence.toFixed(4)} (${grade})
   件数: ${data.count}
   表示: ${data.display || "なし"}`;
@@ -600,4 +649,16 @@ ID: ${_id}
 【地域ごとの信頼度】
 ${areasText}`
     );
+}
+
+const EpspP2PSaibunnData = loadJSON('Item/EpspP2PSaibunn.json');
+function EpspP2PSaibunnGetValue(conditions, returnKey) {
+    return EpspP2PSaibunnData
+        .filter(item => {
+            for (let key in conditions) {
+                if (item[key] !== conditions[key]) return false;
+            }
+            return true;
+        })
+        .map(item => item[returnKey]); // 一致したデータの returnKey の値だけを返す
 }
