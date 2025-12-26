@@ -1,90 +1,35 @@
-/* 全体共通 */
-body, html {
+/* ==================================================
+   変数
+================================================== */
+:root {
+    --main-orange: rgb(228, 148, 61);
+    --menu-dark: #333;
+    --z-back: 0;
+    --z-button: 10;
+    --z-koisi: 10;
+    --z-maintextarea: 20;
+    --z-pagebar: 30;
+    --z-speech-bubble: 30;
+    --z-now-time: 40;
+    --z-menu: 50;
+    --z-toggle-button: 10000;
+}
+
+
+/* ==================================================
+   全体
+================================================== */
+html,
+body {
     margin: 0;
     padding: 0;
     font-family: sans-serif;
 }
 
-/* 現在時刻表示 */
-#now_time {
-    position: fixed;
-    bottom: 0;
-    right: 0;
-    color: black;
-    padding: 0 5px;
-    margin: 0;
-    line-height: 1;
-    border: 2px solid black;
-    border-radius: 5px;
-    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
-    font-size: 25px;
-    z-index: 50;
-    background-color: rgb(26, 175, 138);
-}
 
-/* メインテキストエリア */
-#maintextarea {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 35vh;
-    background-color: rgb(228, 148, 61);
-    z-index: 1;
-    border: none;
-    resize: none;
-    padding: 10px;
-    font-size: 18px;
-    color: #000;
-}
-
-#maintextarea:focus {
-    height: 70vh;
-    background-color: rgba(228, 148, 61, 0.9);
-    z-index: 3;
-}
-
-/* ページバー（スライダー） */
-#pagebar {
-    position: fixed;
-    left: 0;
-    top: 32%;
-    width: 99%;
-    height: 15px;
-    border: 1px solid #282424;
-    background: linear-gradient(90deg, 
-        #dc5fd7 0%, #dc5fd7 25%, 
-        #3fd304 25%, #3fd304 75%, 
-        #dc5fd7 75%, #dc5fd7 100%);
-    cursor: pointer;
-    z-index: 9999;
-
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
-}
-
-/* ツマミ */
-#pagebar::-webkit-slider-thumb {
-    -webkit-appearance: none !important;
-    width: 24px;
-    height: 24px;
-    border: 2px solid #333;
-    border-radius: 50%;
-    background: #2ed91d;
-    cursor: pointer;
-}
-
-#pagebar::-moz-range-thumb {
-    width: 24px;
-    height: 24px;
-    border: 2px solid #333;
-    border-radius: 50%;
-    background: #2ed91d;
-    cursor: pointer;
-}
-
-/* 背景画像 */
+/* ==================================================
+   背景
+================================================== */
 #back {
     position: fixed;
     bottom: 0;
@@ -93,123 +38,207 @@ body, html {
     height: 65vh;
     background-size: cover;
     background-repeat: no-repeat;
-    background-position: center center;
-    z-index: 0;
+    background-position: center;
+    z-index: var(--z-back);
 }
 
-/* 小石画像 */
+
+/* ==================================================
+   キャラ
+================================================== */
 #koisi {
-    width: auto;
-    height: 55vh;
     position: fixed;
     bottom: 0;
     right: 0;
-    z-index: 2;
+    height: 55vh;
+    z-index: var(--z-koisi);
 }
 
-/* 小石矢印ボックス */
+
+/* ==================================================
+   メインテキスト
+================================================== */
+#maintextarea {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 35vh;
+    padding: 10px;
+    font-size: 18px;
+    background-color: var(--main-orange);
+    border: none;
+    resize: none;
+    z-index: var(--z-maintextarea);
+}
+
+#maintextarea:focus {
+    height: 70vh;
+    background-color: rgba(228, 148, 61, 0.9);
+}
+
+
+/* ==================================================
+   ページバー
+================================================== */
+#pagebar {
+    position: fixed;
+    top: 32%;
+    left: 0;
+    width: 99%;
+    height: 15px;
+    border: 1px solid #282424;
+    background: linear-gradient(
+        90deg,
+        #dc5fd7 0%,
+        #dc5fd7 25%,
+        #3fd304 25%,
+        #3fd304 75%,
+        #dc5fd7 75%,
+        #dc5fd7 100%
+    );
+    appearance: none;
+    z-index: var(--z-pagebar);
+}
+
+#pagebar::-webkit-slider-thumb,
+#pagebar::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border: 2px solid #333;
+    border-radius: 50%;
+    background-color: #2ed91d;
+    cursor: pointer;
+}
+
+
+/* ==================================================
+   吹き出し
+================================================== */
 .koisiarrow_box {
     position: absolute;
+    top: 35%;
     width: 91%;
     height: 27px;
-    top: 35%;
-    background: #83FF39;
     text-align: center;
-    border: 5px solid #E6FF82;
-    color: #F6FFFE;
     font-size: 20px;
     font-weight: bold;
+    color: #F6FFFE;
+    background-color: #83FF39;
+    border: 5px solid #E6FF82;
     border-radius: 36px;
-    z-index: 2;
+    z-index: var(--z-speech-bubble);
 }
 
-.koisiarrow_box:after,
-.koisiarrow_box:before {
-    border: solid transparent;
-    content: '';
-    height: 0;
-    width: 0;
-    pointer-events: none;
+.koisiarrow_box::after {
+    content: "";
     position: absolute;
     top: 100%;
     left: 70%;
-}
-
-.koisiarrow_box:after {
-    border-color: rgba(131, 255, 57, 0);
-    border-top-width: 20px;
-    border-bottom-width: 20px;
-    border-left-width: 15px;
-    border-right-width: 15px;
-    margin-left: -15px;
+    border: 20px solid transparent;
     border-top-color: #83FF39;
 }
 
-.koisiarrow_box:before {
-    border-color: rgba(230, 255, 130, 0);
-    border-top-width: 26px;
-    border-bottom-width: 26px;
-    border-left-width: 20px;
-    border-right-width: 20px;
-    margin-left: -20px;
-    margin-top: 5px;
+.koisiarrow_box::before {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 70%;
+    border: 26px solid transparent;
     border-top-color: #E6FF82;
+    margin-top: 5px;
 }
 
-/* メニュー */
-#menu, #infomenu {
+
+/* ==================================================
+   現在時刻
+================================================== */
+#now_time {
+    position: fixed;
+    bottom: -2.5%;
+    right: 0;
+    font-size: 25px;
+    background-color: rgb(26, 175, 138);
+    border: 2px solid black;
+    z-index: var(--z-now-time);
+}
+
+
+/* ==================================================
+   ボタン
+================================================== */
+.menu-toggle-btn {
+    position: fixed;
+    bottom: 30px;
+    padding: 10px;
+    color: white;
+    background-color: var(--menu-dark);
+    border: none;
+    cursor: pointer;
+    z-index: var(--z-toggle-button);
+}
+
+.menu-toggle-btn:hover {
+    background-color: #444;
+}
+
+#toggleMenuBtn {
+    right: 0;
+}
+
+#toggleinfoMenuBtn {
+    left: 0;
+}
+
+
+/* ==================================================
+   メニュー
+================================================== */
+#menu,
+#infomenu {
     position: fixed;
     top: 0;
     width: 250px;
     height: 100%;
-    background-color: #333;
-    color: white;
-    overflow-y: auto;
-    box-shadow: 0 0 10px rgba(0,0,0,0.5);
     padding: 20px;
-    transition: 0.3s ease;
+    background-color: var(--menu-dark);
+    color: white;
+    transition: 0.3s;
+    z-index: var(--z-menu);
 }
 
+/* 右 */
 #menu {
     right: -300px;
-    z-index: 20;
 }
-#menu.open { right: 0; }
 
+#menu.open {
+    right: 0;
+}
+
+/* 左 */
 #infomenu {
     left: -300px;
-    z-index: 20; /* menuと同じレイヤー */
-}
-#infomenu.open { left: 0; }
-
-/* ボタン */
-button {
-    position: fixed;
-    bottom: 30px;
-    background-color: #333;
-    color: white;
-    border: none;
-    padding: 10px;
-    cursor: pointer;
-    z-index: 10; /* メニューより下に */
-    box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
 }
 
-#toggleMenuBtn { right: 0; z-index: 30;}
-#toggleinfoMenuBtn { left: 0; z-index: 30;}
+#infomenu.open {
+    left: 0;
+}
 
-button:hover { background-color: #444; } 
 
-/* 特殊リンク */
-#linker { 
-    background-color: #0dbf95; 
+/* ==================================================
+   リンク
+================================================== */
+#linker {
     display: inline-block;
     margin: 5px 0;
     padding: 5px 10px;
     color: white;
+    background-color: #0dbf95;
     text-decoration: none;
     border-radius: 4px;
 }
+
 #linker:hover {
     background-color: #0aa07c;
 }
