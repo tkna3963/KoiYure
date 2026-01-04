@@ -25,6 +25,9 @@ public class P2PWebsocket {
     private int reconnectDelay = 1000; // 初回は1秒後に再接続
     private final int MAX_DELAY = 16000; // 最大16秒まで延ばす
 
+    // ------------------------
+    // 外部クラス用インターフェース
+    // ------------------------
     public interface Listener {
         void onP2PMessageReceived(String message);
     }
@@ -33,11 +36,28 @@ public class P2PWebsocket {
         this.listener = listener;
     }
 
+    // ------------------------
+    // 外部から操作できるメソッド
+    // ------------------------
     public void start() {
         shouldReconnect = true;
         connect();
     }
 
+    public void stop() {
+        shouldReconnect = false;
+        if (webSocket != null) {
+            webSocket.close(1000, "アプリ終了");
+        }
+    }
+
+    public boolean isConnected() {
+        return webSocket != null; 
+    }
+
+    // ------------------------
+    // 内部メソッド（private）
+    // ------------------------
     private void connect() {
         client = new OkHttpClient();
 
@@ -48,7 +68,7 @@ public class P2PWebsocket {
         webSocket = client.newWebSocket(request, new WebSocketListener() {
             @Override
             public void onOpen(WebSocket webSocket, Response response) {
-                reconnectDelay = 1000; // 接続成功したら再接続遅延をリセット
+                reconnectDelay = 1000;
                 P2PonOpen(response);
             }
 
@@ -82,13 +102,6 @@ public class P2PWebsocket {
         });
     }
 
-    public void stop() {
-        shouldReconnect = false;
-        if (webSocket != null) {
-            webSocket.close(1000, "アプリ終了");
-        }
-    }
-
     private void attemptReconnect() {
         if (!shouldReconnect) return;
         Log.d(TAG, "再接続を試みます " + reconnectDelay + "ms後");
@@ -96,15 +109,14 @@ public class P2PWebsocket {
         handler.postDelayed(() -> {
             if (shouldReconnect) {
                 connect();
-                // 次回の遅延は倍にして最大値を超えないようにする
                 reconnectDelay = Math.min(reconnectDelay * 2, MAX_DELAY);
             }
         }, reconnectDelay);
     }
 
-    // -----------------------
-    // ★ P2P専用メソッド
-    // -----------------------
+    // ------------------------
+    // P2P専用メソッド（ログ用）
+    // ------------------------
     private void P2PonOpen(Response response) {
         Log.d(TAG, "P2P接続成功: " + response.message());
     }
